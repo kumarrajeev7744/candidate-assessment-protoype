@@ -1,9 +1,20 @@
-/** Preferred recording formats, best first. WebM: Chrome/Edge/Firefox. MP4: Safari. */
+/**
+ * Preferred recording formats, best first.
+ * 1. MP4 with H.264 video + AAC audio plays in every browser, including Safari on Mac/iPhone.
+ *    Recorded by Safari and by Google Chrome / Edge (recent versions) on Mac and Windows.
+ * 2. WebM (Firefox, or Chromium builds without an AAC encoder). Safari often cannot play these.
+ * 3. Plain MP4 as a last resort (older Safari, which records H.264 + AAC by default).
+ * Plain "video/mp4" is deliberately NOT preferred over WebM: without an explicit codec, some
+ * Chromium builds record Opus audio in MP4, which Safari may not play.
+ */
 const CANDIDATE_MIME_TYPES = [
+  'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
+  'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+  'video/mp4;codecs=avc1,mp4a.40.2',
+  'video/mp4;codecs=avc1,mp4a',
   'video/webm;codecs=vp9,opus',
   'video/webm;codecs=vp8,opus',
   'video/webm',
-  'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
   'video/mp4',
 ];
 

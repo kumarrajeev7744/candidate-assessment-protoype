@@ -145,6 +145,32 @@ describe('VideoRecorder', () => {
     expect(media.recorders).toHaveLength(2);
   });
 
+  it('prefers MP4 (H.264 + AAC) when supported, so videos also play in Safari', async () => {
+    const media = installFakeMedia();
+    FakeMediaRecorder.supportedTypes = [
+      'video/mp4;codecs=avc1,mp4a.40.2',
+      'video/mp4',
+      'video/webm;codecs=vp9,opus',
+      'video/webm',
+    ];
+    const { onAccept } = renderRecorder();
+    await openCamera();
+    await userEvent.click(screen.getByRole('button', { name: 'Start recording' }));
+    expect(media.recorders[0]!.mimeType).toBe('video/mp4;codecs=avc1,mp4a.40.2');
+    await userEvent.click(screen.getByRole('button', { name: 'Stop recording' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Accept video' }));
+    expect(onAccept.mock.calls[0]![0].mimeType).toBe('video/mp4');
+  });
+
+  it('uses WebM rather than MP4 without AAC audio (e.g. Chromium without an AAC encoder)', async () => {
+    const media = installFakeMedia();
+    FakeMediaRecorder.supportedTypes = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus'];
+    renderRecorder();
+    await openCamera();
+    await userEvent.click(screen.getByRole('button', { name: 'Start recording' }));
+    expect(media.recorders[0]!.mimeType).toBe('video/webm;codecs=vp9,opus');
+  });
+
   it('uses MP4 when the browser does not support WebM (Safari)', async () => {
     const media = installFakeMedia();
     FakeMediaRecorder.supportedTypes = ['video/mp4'];
