@@ -6,7 +6,7 @@ import { formatDateTime } from '../../utils/format';
 import { resumePath } from './resumePosition';
 
 export function AssessmentStartPage() {
-  const { token, data, drafts, start, reload } = useAssessment();
+  const { token, data, firstIncompleteNumber, start, reload } = useAssessment();
   const navigate = useNavigate();
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +16,7 @@ export function AssessmentStartPage() {
 
   // Returning candidate: continue where they left off.
   if (assessment.status === 'In Progress' && !starting) {
-    return <Navigate to={resumePath(token, data, drafts)} replace />;
+    return <Navigate to={resumePath(token, firstIncompleteNumber)} replace />;
   }
 
   async function handleStart() {
@@ -67,9 +67,17 @@ export function AssessmentStartPage() {
           <strong>video answer</strong> (up to {videoMinutes} minutes).
         </li>
         <li>Your written answers are saved automatically as you type.</li>
+        <li>
+          For each video, you can watch your recording and record it again before accepting it. Accepted videos are
+          uploaded straight away.
+        </li>
+        <li>You can move to the next question once both the written answer and the video are saved.</li>
         <li>You can go back to earlier questions and edit your answers before submitting.</li>
         <li>If you close the page, reopen the link from your email to continue where you left off.</li>
-        <li>Use a computer with a camera and microphone, a modern browser and a stable internet connection.</li>
+        <li>
+          Use a computer with a camera and microphone, a modern browser and a stable internet connection. Your browser
+          will ask for permission to use them.
+        </li>
       </ul>
 
       {error && (

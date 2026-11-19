@@ -9,3 +9,18 @@ export const saveResponseSchema = z.object({
 });
 
 export type SaveResponseInput = z.infer<typeof saveResponseSchema>;
+
+export const videoUploadUrlSchema = z.object({
+  mimeType: z.string({ error: 'mimeType is required' }).trim().min(1, 'mimeType is required').max(100),
+  sizeBytes: z
+    .number({ error: 'sizeBytes must be a number' })
+    .int('sizeBytes must be a whole number')
+    .positive('The video is empty. Please record again.'),
+});
+
+export const videoConfirmSchema = z.object({
+  objectKey: z.string({ error: 'objectKey is required' }).trim().min(1, 'objectKey is required').max(300),
+});
+
+export type VideoUploadUrlInput = z.infer<typeof videoUploadUrlSchema>;
+export type VideoConfirmInput = z.infer<typeof videoConfirmSchema>;

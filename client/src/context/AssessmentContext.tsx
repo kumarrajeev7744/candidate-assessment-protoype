@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { ApiError } from '../services/apiClient';
 import * as assessmentApi from '../services/assessmentService';
-import type { AssessmentData, AssessmentQuestion } from '../types/assessment';
+import type { AssessmentData, AssessmentQuestion, SavedResponse } from '../types/assessment';
 
 /** Tunable for tests. */
 export const assessmentSettings = { autosaveDelayMs: 1000 };
@@ -33,6 +33,15 @@ export interface AssessmentContextValue {
   saveStatus: Record<string, SaveStatus>;
   saveError: string | null;
   writtenAnsweredCount: number;
+  /** Questions with a written answer and a confirmed video upload. */
+  completedCount: number;
+  /** 1-based number of the first incomplete question, or null when all are complete. */
+  firstIncompleteNumber: number | null;
+  isQuestionComplete: (question: AssessmentQuestion) => boolean;
+  /** Merges a response returned by the API (e.g. after a video upload) into the loaded data. */
+  applySavedResponse: (response: SavedResponse) => void;
+  /** Switches to the invalid/expired/submitted screen for such errors. Returns true if handled. */
+  handleFatalError: (err: unknown) => boolean;
   reload: () => void;
   start: () => Promise<void>;
   updateDraft: (questionId: string, text: string) => void;
@@ -246,6 +255,31 @@ export function AssessmentProvider({ token, children }: { token: string; childre
 
   const writtenAnsweredCount = Object.values(drafts).filter((text) => text.trim().length > 0).length;
 
+  const isQuestionComplete = useCallback(
+    (q: AssessmentQuestion) => (drafts[q.id] ?? '').trim().length > 0 && q.response?.videoStatus === 'Uploaded',
+    [drafts],
+  );
+  const questions = data?.questions;
+  const completedCount = questions?.filter(isQuestionComplete).length ?? 0;
+  const firstIncompleteIndex = questions?.findIndex((q) => !isQuestionComplete(q)) ?? -1;
+  const firstIncompleteNumber = firstIncompleteIndex === -1 ? null : firstIncompleteIndex + 1;
+
+  const applySavedResponse = useCallback((response: SavedResponse) => {
+    setData(
+      (prev) =>
+        prev && {
+          ...prev,
+          questions: prev.questions.map((q) => (q.id === response.questionId ? { ...q, response } : q)),
+        },
+    );
+  }, []);
+
+  const handleFatalError = useCallback((err: unknown) => {
+    const fatal = fatalFromError(err);
+    if (fatal) setLoad(fatal);
+    return Boolean(fatal);
+  }, []);
+
   const value = useMemo<AssessmentContextValue>(
     () => ({
       token,
@@ -255,13 +289,36 @@ export function AssessmentProvider({ token, children }: { token: string; childre
       saveStatus,
       saveError,
       writtenAnsweredCount,
+      completedCount,
+      firstIncompleteNumber,
+      isQuestionComplete,
+      applySavedResponse,
+      handleFatalError,
       reload,
       start,
       updateDraft,
       saveNow,
       hasUnsavedChanges,
     }),
-    [token, load, data, drafts, saveStatus, saveError, writtenAnsweredCount, reload, start, updateDraft, saveNow, hasUnsavedChanges],
+    [
+      token,
+      load,
+      data,
+      drafts,
+      saveStatus,
+      saveError,
+      writtenAnsweredCount,
+      completedCount,
+      firstIncompleteNumber,
+      isQuestionComplete,
+      applySavedResponse,
+      handleFatalError,
+      reload,
+      start,
+      updateDraft,
+      saveNow,
+      hasUnsavedChanges,
+    ],
   );
 
   return <AssessmentContext.Provider value={value}>{children}</AssessmentContext.Provider>;

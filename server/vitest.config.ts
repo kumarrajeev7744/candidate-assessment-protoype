@@ -17,6 +17,12 @@ export default defineConfig({
       SMTP_PASS: 'test-app-password',
       SMTP_FROM: 'Candidate Assessment <sender@example.com>',
       EMAIL_TIMEZONE: 'UTC',
+      AWS_REGION: 'ap-south-1',
+      S3_VIDEO_BUCKET: 'test-video-bucket',
+      AWS_ACCESS_KEY_ID: 'AKIATESTONLY',
+      AWS_SECRET_ACCESS_KEY: 'test-only-secret',
+      VIDEO_MAX_MB: '200',
+      VIDEO_URL_EXPIRES_IN: '15m',
     },
   },
 });

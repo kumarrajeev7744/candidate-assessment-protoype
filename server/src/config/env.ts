@@ -20,6 +20,19 @@ export interface AppConfig {
   smtp: SmtpConfig;
   /** IANA time zone used to format dates in emails (e.g. Asia/Kolkata). */
   emailTimeZone: string;
+  video: VideoStorageConfig;
+}
+
+export interface VideoStorageConfig {
+  /** AWS region of the video bucket. Credentials come from the AWS default provider chain. */
+  region: string | undefined;
+  bucket: string | undefined;
+  /** Optional S3-compatible endpoint for local development (e.g. MinIO). Leave unset for AWS. */
+  endpoint: string | undefined;
+  /** Maximum accepted video size in bytes (VIDEO_MAX_MB). */
+  maxBytes: number;
+  /** Lifetime of presigned upload/playback URLs in seconds. */
+  urlExpiresInSeconds: number;
 }
 
 export interface SmtpConfig {
@@ -106,6 +119,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       from: env.SMTP_FROM?.trim() || undefined,
     },
     emailTimeZone: parseTimeZone(env.EMAIL_TIMEZONE),
+    video: {
+      region: env.AWS_REGION?.trim() || undefined,
+      bucket: env.S3_VIDEO_BUCKET?.trim() || undefined,
+      endpoint: env.S3_ENDPOINT?.trim() || undefined,
+      maxBytes: (parseNonNegativeInt(env.VIDEO_MAX_MB, 200, 'VIDEO_MAX_MB') || 200) * 1024 * 1024,
+      urlExpiresInSeconds: parseDurationSeconds(env.VIDEO_URL_EXPIRES_IN, 900, 'VIDEO_URL_EXPIRES_IN'),
+    },
   };
 }
 
