@@ -6,6 +6,8 @@ export interface AppConfig {
   port: number;
   nodeEnv: NodeEnv;
   clientUrls: string[];
+  /** MongoDB connection string. Required at server startup, optional for unit tests. */
+  mongodbUri: string | undefined;
 }
 
 function parseNodeEnv(value: string | undefined): NodeEnv {
@@ -29,6 +31,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       .split(',')
       .map((url) => url.trim())
       .filter(Boolean),
+    mongodbUri: env.MONGODB_URI?.trim() || undefined,
   };
 }
 
