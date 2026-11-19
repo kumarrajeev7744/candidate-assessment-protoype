@@ -9,7 +9,7 @@ import { questionSeedData } from '../src/seed/questionSeedData.js';
 import { seedQuestions } from '../src/services/questionSeedService.js';
 import { generateToken, hashToken } from '../src/utils/token.js';
 import { S3VideoStorage, createS3Client } from '../src/services/storage/videoStorage.js';
-import { normalizeVideoMimeType } from '../src/services/videoService.js';
+import { normalizeVideoMimeType, videoKeyPrefix } from '../src/services/videoService.js';
 
 useTestDatabase();
 
@@ -74,13 +74,15 @@ describe('POST /video-upload-url', () => {
     expect(res.headers['cache-control']).toBe('no-store');
     expect(res.body).toEqual({
       uploadUrl: expect.stringMatching(/^https:\/\/fake-s3\.test\//),
-      objectKey: expect.stringMatching(
-        new RegExp(`^videos/${fx.candidateId.toString()}/${questionIds[0]}/\\d{13}-[a-f0-9]{24}\\.webm$`),
-      ),
+      objectKey: expect.stringMatching(/^videos\/[a-f0-9]{32}\/\d{13}-[a-f0-9]{24}\.webm$/),
       method: 'PUT',
       headers: { 'Content-Type': 'video/webm' },
       expiresAt: expect.any(String),
     });
+    expect(res.body.objectKey.startsWith(videoKeyPrefix(fx.candidateId.toString(), questionIds[0]!))).toBe(true);
+    // The key reveals no internal IDs.
+    expect(res.body.objectKey).not.toContain(fx.candidateId.toString());
+    expect(res.body.objectKey).not.toContain(questionIds[0]);
     expect(s3.storage.createUploadUrl).toHaveBeenCalledWith(res.body.objectKey, 'video/webm', 1234, 900);
     const expiresInMs = Date.parse(res.body.expiresAt) - Date.now();
     expect(expiresInMs).toBeGreaterThan(14 * 60_000);
@@ -109,7 +111,7 @@ describe('POST /video-upload-url', () => {
       objectKey: 'videos/evil/key.webm',
     });
     expect(res.body.objectKey).not.toBe('videos/evil/key.webm');
-    expect(res.body.objectKey.startsWith(`videos/${fx.candidateId.toString()}/`)).toBe(true);
+    expect(res.body.objectKey.startsWith(videoKeyPrefix(fx.candidateId.toString(), questionIds[0]!))).toBe(true);
   });
 
   it('rejects missing or invalid candidate tokens', async () => {

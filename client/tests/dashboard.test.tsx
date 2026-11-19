@@ -72,6 +72,9 @@ function installBackend(backend: Backend) {
     calls.push({ method, path, search: url.search, body, auth });
 
     if (path === '/auth/me') return json(200, { admin: ADMIN });
+    if (method === 'GET' && /^\/candidates\/[^/]+\/report$/.test(path)) {
+      return json(404, { error: { code: 'CANDIDATE_NOT_FOUND', message: 'Candidate not found.' } });
+    }
     if (path === '/auth/logout') return json(200, { message: 'Logged out' });
     if (method === 'GET' && path === '/invitations') {
       if (backend.listDelayMs) await new Promise((r) => setTimeout(r, backend.listDelayMs));
@@ -222,12 +225,12 @@ describe('Recruiter dashboard', () => {
     expect(await screen.findByRole('cell', { name: 'Late Arrival' })).toBeInTheDocument();
   });
 
-  it('navigates to the candidate report placeholder', async () => {
-    await openDashboard({ rows: ROWS });
+  it('navigates to the candidate report', async () => {
+    const api = await openDashboard({ rows: ROWS });
     await screen.findByRole('table');
     await userEvent.click(screen.getByRole('link', { name: 'Open report for Arjun Progress' }));
-    expect(await screen.findByRole('heading', { name: 'Candidate report' })).toBeInTheDocument();
-    expect(screen.getByText('Candidate reference: cand-inv2')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Candidate not found' })).toBeInTheDocument();
+    expect(api.calls.some((c) => c.path === '/candidates/cand-inv2/report')).toBe(true);
     await userEvent.click(screen.getByRole('link', { name: '← Back to candidates' }));
     expect(await screen.findByRole('heading', { name: 'Candidates' })).toBeInTheDocument();
   });

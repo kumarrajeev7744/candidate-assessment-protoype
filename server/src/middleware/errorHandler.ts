@@ -68,7 +68,8 @@ export function errorHandler(
   _next: NextFunction,
 ): void {
   const { status, body } = toErrorResponse(err);
-  if (status >= 500) {
+  // Expected application errors (AppError, e.g. a failed email = 502) are logged where they occur.
+  if (status >= 500 && !(err instanceof AppError)) {
     logger.error('Unhandled error', {
       error: String(err),
       stack: err instanceof Error ? err.stack : undefined,

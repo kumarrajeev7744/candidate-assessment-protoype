@@ -4,6 +4,7 @@ import { LandingPage } from '../pages/LandingPage';
 import { LoginPage, DASHBOARD_PATH } from '../pages/LoginPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { CandidateReportPage } from '../pages/CandidateReportPage';
+import { SharedResponsePage } from '../pages/SharedResponsePage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { AssessmentLayout } from '../pages/assessment/AssessmentLayout';
 import { AssessmentStartPage } from '../pages/assessment/AssessmentStartPage';
@@ -18,6 +19,7 @@ export function AppRoutes() {
       <Route element={<Layout />}>
         <Route index element={<LandingPage />} />
         <Route path="admin/login" element={<LoginPage />} />
+        <Route path="shared-response/:token" element={<SharedResponsePage />} />
         <Route path="assessment/:token" element={<AssessmentLayout />}>
           <Route index element={<AssessmentStartPage />} />
           <Route path="questions/:number" element={<QuestionPage />} />
