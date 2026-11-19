@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { VideoPlayback } from '../../types/report';
+import { diagnoseVideoFailure } from '../../utils/videoDiagnostics';
 
 interface Props {
   video: VideoPlayback;
@@ -17,6 +18,17 @@ export function RefreshingVideo({ video, label, onRefresh }: Props) {
   const [refreshed, setRefreshed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [reason, setReason] = useState<string | null>(null);
+
+  const markFailed = (playback: VideoPlayback) => {
+    setFailed(true);
+    if (playback.url) {
+      void diagnoseVideoFailure(playback.url, playback.mimeType).then((text) => {
+        console.warn('Video playback failed:', text);
+        setReason(text);
+      });
+    }
+  };
 
   async function refresh(manual: boolean) {
     setRefreshing(true);
@@ -25,6 +37,7 @@ export function RefreshingVideo({ video, label, onRefresh }: Props) {
       if (next?.url) {
         setCurrent(next);
         setFailed(false);
+        setReason(null);
       } else {
         setFailed(true);
       }
@@ -40,10 +53,15 @@ export function RefreshingVideo({ video, label, onRefresh }: Props) {
   if (!current.url || failed) {
     return (
       <div className="video-unavailable" role="status">
-        <span>The video could not be loaded.</span>
+        <span>{reason ?? 'The video could not be loaded.'}</span>
         <button type="button" className="button-secondary button-small" onClick={() => void refresh(true)} disabled={refreshing}>
           {refreshing ? 'Loading…' : 'Retry video'}
         </button>
+        {current.url && (
+          <a href={current.url} target="_blank" rel="noreferrer noopener" className="button-link-plain">
+            Open video in a new tab
+          </a>
+        )}
       </div>
     );
   }
@@ -59,7 +77,7 @@ export function RefreshingVideo({ video, label, onRefresh }: Props) {
       onError={() => {
         if (refreshing) return;
         if (!refreshed) void refresh(false); // probably an expired URL: get a fresh one once
-        else setFailed(true);
+        else markFailed(current);
       }}
     />
   );

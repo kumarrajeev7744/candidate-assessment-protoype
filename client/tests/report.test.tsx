@@ -172,7 +172,7 @@ describe('Candidate report page', () => {
     await act(async () => {
       fireEvent.error(within(item(2)).getByLabelText('Video answer to question 2'));
     });
-    expect(within(item(2)).getByText('The video could not be loaded.')).toBeInTheDocument();
+    expect(within(item(2)).getByRole('button', { name: 'Retry video' })).toBeInTheDocument();
     await userEvent.click(within(item(2)).getByRole('button', { name: 'Retry video' }));
     expect(await within(item(2)).findByLabelText('Video answer to question 2')).toBeInTheDocument();
     expect(api.reportCount()).toBe(3);
@@ -262,5 +262,45 @@ describe('Share dialog', () => {
     fireEvent.submit(sending.closest('form')!);
     await within(dialog).findByRole('status');
     expect(shareCalls(api)).toHaveLength(1);
+  });
+});
+
+describe('Video failure diagnostics', () => {
+  async function failTwice(n: number) {
+    await act(async () => {
+      fireEvent.error(within(item(n)).getByLabelText(`Video answer to question ${n}`));
+    });
+    await waitFor(() => expect(within(item(n)).getByLabelText(`Video answer to question ${n}`)).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.error(within(item(n)).getByLabelText(`Video answer to question ${n}`));
+    });
+  }
+
+  it('explains an S3 access error', async () => {
+    const api = await openReport({ report: makeReport() });
+    await screen.findByRole('heading', { level: 1, name: 'Priya Sharma' });
+    const original = api.fetchMock.getMockImplementation()!;
+    api.fetchMock.mockImplementation(async (input, init) =>
+      String(input).startsWith('https://s3.test/')
+        ? new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 })
+        : original(input, init),
+    );
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    await failTwice(1);
+    expect(await within(item(1)).findByText('The video file could not be accessed (S3 refused the request: AccessDenied).')).toBeInTheDocument();
+    expect(within(item(1)).getByRole('link', { name: 'Open video in a new tab' })).toHaveAttribute('href', expect.stringMatching(/^https:\/\/s3\.test\//));
+  });
+
+  it('explains an unsupported format (e.g. WebM in Safari)', async () => {
+    const api = await openReport({ report: makeReport() });
+    await screen.findByRole('heading', { level: 1, name: 'Priya Sharma' });
+    const original = api.fetchMock.getMockImplementation()!;
+    api.fetchMock.mockImplementation(async (input, init) =>
+      String(input).startsWith('https://s3.test/') ? new Response('x', { status: 206 }) : original(input, init),
+    );
+    vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue('');
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    await failTwice(2);
+    expect(await within(item(2)).findByText(/This browser cannot play video\/webm videos\. Please open the report in Chrome, Edge or Firefox\./)).toBeInTheDocument();
   });
 });
