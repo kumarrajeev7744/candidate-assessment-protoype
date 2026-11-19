@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { assessmentSettings } from '../src/context/AssessmentContext';
 import { storePosition } from '../src/utils/assessmentPosition';
 import { renderApp } from './helpers/renderApp';
-import { installFakeAssessmentApi, QUESTIONS, TOKEN } from './helpers/fakeAssessmentApi';
+import { completeUpTo, installFakeAssessmentApi, QUESTIONS, TOKEN } from './helpers/fakeAssessmentApi';
 
 const BASE = `/assessment/${TOKEN}`;
 
@@ -59,7 +59,7 @@ describe('Assessment start screen', () => {
 
 describe('Question navigation', () => {
   it('displays questions in order with Previous and Next', async () => {
-    await openQuestion(1);
+    await openQuestion(1, completeUpTo(10));
     expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
 
     for (let n = 2; n <= 10; n++) {
@@ -74,7 +74,7 @@ describe('Question navigation', () => {
   });
 
   it('keeps and reloads answers when revisiting a question', async () => {
-    const api = await openQuestion(1);
+    const api = await openQuestion(1, { videos: [1] });
     await userEvent.type(textarea(), 'Answer one');
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
     await questionHeading(2);
@@ -87,7 +87,7 @@ describe('Question navigation', () => {
   });
 
   it('loads previously saved answers from the server and allows editing them', async () => {
-    const api = await openQuestion(2, { answers: { 2: 'Saved earlier' } });
+    const api = await openQuestion(2, { answers: { 1: 'One', 2: 'Saved earlier' }, videos: [1] });
     expect(textarea()).toHaveValue('Saved earlier');
     await userEvent.type(textarea(), ' and edited');
     await waitFor(() => expect(api.state.answers.get(QUESTIONS[1]!.id)).toBe('Saved earlier and edited'));
@@ -95,7 +95,7 @@ describe('Question navigation', () => {
 
   it('saves explicitly before moving to another question', async () => {
     assessmentSettings.autosaveDelayMs = 60_000; // autosave would not fire in time
-    const api = await openQuestion(1);
+    const api = await openQuestion(1, { videos: [1] });
     await userEvent.type(textarea(), 'Typed quickly');
     expect(api.saves).toHaveLength(0);
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
@@ -136,7 +136,7 @@ describe('Autosave', () => {
   });
 
   it('never sends overlapping saves for the same question and ends with the latest text', async () => {
-    const api = await openQuestion(1);
+    const api = await openQuestion(1, { videos: [1] });
     api.state.saveDelayMs = 80;
     await userEvent.type(textarea(), 'first');
     await screen.findByText('Saving…');
@@ -180,7 +180,7 @@ describe('Autosave', () => {
 
 describe('Review screen', () => {
   it('lists all 10 questions with saved answers and flags missing ones', async () => {
-    installFakeAssessmentApi({ status: 'In Progress', answers: { 1: 'Alpha answer', 4: 'Delta answer' } });
+    installFakeAssessmentApi({ status: 'In Progress', answers: { 1: 'Alpha answer', 4: 'Delta answer' }, videos: [1] });
     renderApp(`${BASE}/review`);
 
     expect(await screen.findByRole('heading', { name: 'Review your answers' })).toBeInTheDocument();
@@ -191,18 +191,18 @@ describe('Review screen', () => {
     expect(within(items[3]!).getByText('Delta answer')).toBeInTheDocument();
     expect(within(items[1]!).getByText('No written answer yet')).toBeInTheDocument();
     expect(screen.getAllByText('No written answer yet')).toHaveLength(8);
-    expect(screen.getByText('8 questions are missing a written answer.')).toBeInTheDocument();
-    expect(screen.getByText('2 of 10 written answers')).toBeInTheDocument();
+    expect(screen.getByText('9 questions still need a written answer and a video.')).toBeInTheDocument();
+    expect(screen.getByText('1 of 10 questions complete')).toBeInTheDocument();
   });
 
   it('is reached by Next on the last question', async () => {
-    await openQuestion(10);
+    await openQuestion(10, completeUpTo(10));
     await userEvent.click(screen.getByRole('button', { name: 'Review answers' }));
     expect(await screen.findByRole('heading', { name: 'Review your answers' })).toBeInTheDocument();
   });
 
   it('Edit returns to the selected question', async () => {
-    installFakeAssessmentApi({ status: 'In Progress', answers: { 6: 'Sixth' } });
+    installFakeAssessmentApi({ status: 'In Progress', ...completeUpTo(5), answers: { ...completeUpTo(5).answers, 6: 'Sixth' } });
     renderApp(`${BASE}/review`);
     await screen.findByRole('heading', { name: 'Review your answers' });
 
@@ -214,30 +214,30 @@ describe('Review screen', () => {
 
 describe('Resume', () => {
   it('restores the question and saved answers on refresh', async () => {
-    installFakeAssessmentApi({ status: 'In Progress', answers: { 1: 'One', 2: 'Two', 3: 'Three draft' } });
+    installFakeAssessmentApi({ status: 'In Progress', answers: { 1: 'One', 2: 'Two', 3: 'Three draft' }, videos: [1, 2] });
     renderApp(`${BASE}/questions/3`);
 
     expect(await questionHeading(3)).toBeInTheDocument();
     expect(textarea()).toHaveValue('Three draft');
-    expect(screen.getByText('3 of 10 written answers')).toBeInTheDocument();
+    expect(screen.getByText('2 of 10 questions complete')).toBeInTheDocument();
   });
 
   it('reopening the email link continues at the last question viewed', async () => {
     storePosition(TOKEN, 7);
-    const api = installFakeAssessmentApi({ status: 'In Progress', answers: { 1: 'One' } });
+    const api = installFakeAssessmentApi({ status: 'In Progress', ...completeUpTo(8) });
     renderApp(BASE);
     expect(await questionHeading(7)).toBeInTheDocument();
     expect(api.starts).toHaveLength(0);
   });
 
-  it('without a stored position, continues at the first unanswered question', async () => {
-    installFakeAssessmentApi({ status: 'In Progress', answers: { 1: 'One', 2: 'Two' } });
+  it('without a stored position, continues at the first incomplete question', async () => {
+    installFakeAssessmentApi({ status: 'In Progress', ...completeUpTo(2) });
     renderApp(BASE);
     expect(await questionHeading(3)).toBeInTheDocument();
   });
 
   it('remembers the current question as the candidate moves', async () => {
-    const api = await openQuestion(4);
+    const api = await openQuestion(4, completeUpTo(5));
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
     await questionHeading(5);
     expect(api.saves).toHaveLength(0); // nothing typed, nothing saved

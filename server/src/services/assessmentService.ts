@@ -72,7 +72,7 @@ async function loadActiveQuestions() {
   return questions;
 }
 
-function toResponseDto(r: {
+export function toResponseDto(r: {
   questionId: Types.ObjectId;
   writtenAnswer: string;
   video?: { uploadStatus: VideoUploadStatus } | null;

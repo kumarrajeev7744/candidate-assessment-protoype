@@ -22,7 +22,13 @@ describe('loadConfig', () => {
         from: undefined,
       },
       emailTimeZone: 'UTC',
+      video: { region: undefined, bucket: undefined, endpoint: undefined, maxBytes: 200 * 1024 * 1024, urlExpiresInSeconds: 900 },
     });
+  });
+
+  it('parses video storage settings', () => {
+    const cfg = loadConfig({ AWS_REGION: 'ap-south-1', S3_VIDEO_BUCKET: 'b', VIDEO_MAX_MB: '50', VIDEO_URL_EXPIRES_IN: '5m' });
+    expect(cfg.video).toEqual({ region: 'ap-south-1', bucket: 'b', endpoint: undefined, maxBytes: 50 * 1024 * 1024, urlExpiresInSeconds: 300 });
   });
 
   it('parses SMTP settings and strips spaces from Gmail App Passwords', () => {
