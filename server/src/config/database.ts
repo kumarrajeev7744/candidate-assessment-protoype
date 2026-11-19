@@ -26,12 +26,14 @@ export function validateMongoUri(uri: string | undefined): string {
 
 let listenersRegistered = false;
 let closingIntentionally = false;
+/** True once a connection has been established; avoids a misleading warning when the first connect fails. */
+let hasConnected = false;
 
 function registerConnectionListeners(): void {
   if (listenersRegistered) return;
   listenersRegistered = true;
   mongoose.connection.on('disconnected', () => {
-    if (!closingIntentionally) logger.warn('MongoDB disconnected');
+    if (hasConnected && !closingIntentionally) logger.warn('MongoDB disconnected');
   });
   mongoose.connection.on('reconnected', () => logger.info('MongoDB reconnected'));
   mongoose.connection.on('error', (err: Error) =>
@@ -57,6 +59,7 @@ export async function connectDatabase(
       { cause: err },
     );
   }
+  hasConnected = true;
   logger.info('MongoDB connected', {
     target: describeMongoUri(validUri),
     database: mongoose.connection.name,
@@ -71,6 +74,7 @@ export async function disconnectDatabase(): Promise<void> {
     await mongoose.disconnect();
   } finally {
     closingIntentionally = false;
+    hasConnected = false;
   }
   logger.info('MongoDB connection closed');
 }
