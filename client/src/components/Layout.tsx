@@ -6,7 +6,10 @@ export function Layout() {
   const { status, admin, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const signedIn = status === 'authenticated';
+  // Candidate and hiring-manager pages are standalone: no links into the recruiter area,
+  // even if this browser tab also holds a recruiter session.
+  const isPublicFlow = pathname.startsWith('/assessment/') || pathname.startsWith('/shared-response/');
+  const signedIn = status === 'authenticated' && !isPublicFlow;
   // Candidate reports belong to the Candidates section too.
   const candidatesActive = pathname.startsWith('/admin/dashboard') || pathname.startsWith('/admin/candidates');
 
@@ -19,10 +22,17 @@ export function Layout() {
     <div className="app">
       <header className="app-header">
         <div className="app-header-inner">
-          <Link to={signedIn ? '/admin/dashboard' : '/'} className="app-brand">
-            <BrandMark />
-            <span className="brand-name">Candidate Assessment Platform</span>
-          </Link>
+          {isPublicFlow ? (
+            <span className="app-brand">
+              <BrandMark />
+              <span className="brand-name">Candidate Assessment Platform</span>
+            </span>
+          ) : (
+            <Link to={signedIn ? '/admin/dashboard' : '/'} className="app-brand">
+              <BrandMark />
+              <span className="brand-name">Candidate Assessment Platform</span>
+            </Link>
+          )}
           {signedIn && (
             <>
               <nav className="app-nav" aria-label="Recruiter">

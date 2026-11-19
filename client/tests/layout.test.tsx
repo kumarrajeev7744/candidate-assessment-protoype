@@ -40,3 +40,25 @@ describe('Icons', () => {
     expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
   });
 });
+
+describe('Candidate and shared pages', () => {
+  it.each([`/assessment/${'T'.repeat(43)}`, `/shared-response/${'S'.repeat(43)}`])(
+    'show the brand without any link or recruiter controls on %s, even with a recruiter session in the tab',
+    async (path) => {
+      storeSession({ token: 'jwt', expiresAt: futureIso() });
+      mockApi({
+        'GET /auth/me': () => ({ status: 200, body: { admin: ADMIN } }),
+        [`GET /assessment`]: () => ({ status: 409, body: { error: { code: 'ASSESSMENT_COMPLETED', message: 'x' } } }),
+        [`GET /shared-responses/${'S'.repeat(43)}`]: () => ({ status: 404, body: { error: { code: 'X', message: 'x' } } }),
+      });
+      renderApp(path);
+      await screen.findByRole('heading', { level: 1 });
+      const banner = screen.getByRole('banner');
+      expect(within(banner).getByText('Candidate Assessment Platform')).toBeInTheDocument();
+      expect(within(banner).queryByRole('link')).not.toBeInTheDocument();
+      expect(within(banner).queryByRole('navigation')).not.toBeInTheDocument();
+      expect(within(banner).queryByRole('button', { name: /Log out/ })).not.toBeInTheDocument();
+      expect(within(banner).queryByText(ADMIN.email)).not.toBeInTheDocument();
+    },
+  );
+});
