@@ -14,6 +14,7 @@ import { generateToken, hashToken, isWellFormedToken } from '../utils/token.js';
 import { logger } from '../utils/logger.js';
 import { EmailNotConfiguredError, isEmailConfigured, sendEmail } from './email/emailService.js';
 import { buildInvitationEmail } from './email/templates/invitationEmail.js';
+import { deliverConfirmationEmail } from './confirmationEmailService.js';
 import type { CreateInvitationInput } from '../validation/invitationSchemas.js';
 
 export interface CandidateDto {
@@ -31,6 +32,8 @@ export interface InvitationDto {
   expiresAt: string;
   completedAt: string | null;
   emailStatus: string;
+  confirmationEmailStatus: string | null;
+  confirmationEmailSentAt: string | null;
   isExpired: boolean;
 }
 
@@ -63,6 +66,8 @@ function toInvitationDto(inv: InvitationDocument): InvitationDto {
     expiresAt: inv.expiresAt.toISOString(),
     completedAt: inv.completedAt ? inv.completedAt.toISOString() : null,
     emailStatus: inv.emailStatus,
+    confirmationEmailStatus: inv.confirmationEmailStatus ?? null,
+    confirmationEmailSentAt: inv.confirmationEmailSentAt ? inv.confirmationEmailSentAt.toISOString() : null,
     isExpired: inv.status !== 'Completed' && isExpired(inv.expiresAt),
   };
 }
@@ -141,10 +146,14 @@ export async function createInvitation(input: CreateInvitationInput): Promise<In
   return { candidate: toCandidateDto(candidate), invitation: toInvitationDto(invitation), email };
 }
 
-export async function resendInvitation(invitationId: string): Promise<InvitationResult> {
+function assertInvitationId(invitationId: string): void {
   if (!/^[a-f0-9]{24}$/i.test(invitationId) || !Types.ObjectId.isValid(invitationId)) {
     throw new AppError(400, 'Invalid invitation ID.', 'INVALID_ID');
   }
+}
+
+export async function resendInvitation(invitationId: string): Promise<InvitationResult> {
+  assertInvitationId(invitationId);
   const invitation = await Invitation.findById(invitationId);
   if (!invitation) throw new AppError(404, 'Invitation not found.', 'INVITATION_NOT_FOUND');
   if (invitation.status === 'Completed') {
@@ -197,4 +206,28 @@ export async function validateInvitationToken(rawToken: string): Promise<Invitat
     );
   }
   return { valid: true, status: invitation.status, expiresAt: invitation.expiresAt.toISOString() };
+}
+
+/**
+ * Retries the submission confirmation email for a completed assessment whose confirmation
+ * was not delivered. Never changes the assessment status or completion time.
+ */
+export async function resendConfirmationEmail(invitationId: string): Promise<InvitationResult> {
+  assertInvitationId(invitationId);
+  const invitation = await Invitation.findById(invitationId);
+  if (!invitation) throw new AppError(404, 'Invitation not found.', 'INVITATION_NOT_FOUND');
+  if (invitation.status !== 'Completed') {
+    throw new AppError(409, 'This assessment has not been submitted yet.', 'ASSESSMENT_NOT_COMPLETED');
+  }
+  if (invitation.confirmationEmailStatus === 'Sent') {
+    throw new AppError(409, 'The confirmation email has already been sent.', 'CONFIRMATION_ALREADY_SENT');
+  }
+  if (!isEmailConfigured()) throw new EmailNotConfiguredError();
+  const candidate = await Candidate.findById(invitation.candidateId);
+  if (!candidate) throw new AppError(404, 'Candidate not found for this invitation.', 'CANDIDATE_NOT_FOUND');
+
+  const email = await deliverConfirmationEmail(invitation._id);
+  const updated = (await Invitation.findById(invitation._id))!;
+  logger.info('Confirmation email resent', { invitationId, sent: email.sent });
+  return { candidate: toCandidateDto(candidate), invitation: toInvitationDto(updated), email };
 }

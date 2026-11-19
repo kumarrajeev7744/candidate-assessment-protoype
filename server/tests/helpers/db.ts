@@ -1,22 +1,33 @@
 import { afterAll, afterEach, beforeAll } from 'vitest';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
 import { connectDatabase, disconnectDatabase } from '../../src/config/database.js';
 import * as models from '../../src/models/index.js';
 
-/** Starts an isolated in-memory MongoDB for the current test file and cleans data between tests. */
+/**
+ * Starts an isolated in-memory MongoDB (single-node replica set, so transactions work like on
+ * Atlas) for the current test file and cleans data between tests.
+ */
 export function useTestDatabase(): void {
-  let mongod: MongoMemoryServer;
+  let replSet: MongoMemoryReplSet;
 
   beforeAll(async () => {
-    mongod = await MongoMemoryServer.create();
-    await connectDatabase(mongod.getUri('test'));
-    // Build all indexes up front so unique constraints are enforced in tests.
-    await Promise.all(
-      [models.Admin, models.Candidate, models.Invitation, models.Question, models.Response, models.ShareLink].map(
-        (m) => m.init(),
-      ),
-    );
+    replSet = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' } });
+    await connectDatabase(replSet.getUri('test'));
+    // Build all indexes (and collections) up front: unique constraints are enforced and
+    // collections exist before transactions use them.
+    const all: mongoose.Model<never>[] = [
+      models.Admin,
+      models.Candidate,
+      models.Invitation,
+      models.Question,
+      models.Response,
+      models.ShareLink,
+    ] as never;
+    for (const model of all) {
+      await model.createCollection().catch(() => undefined);
+      await model.init();
+    }
   });
 
   afterEach(async () => {
@@ -26,6 +37,6 @@ export function useTestDatabase(): void {
 
   afterAll(async () => {
     await disconnectDatabase();
-    await mongod?.stop();
+    await replSet?.stop();
   });
 }

@@ -17,6 +17,12 @@ export interface IInvitation {
   expiresAt: Date;
   completedAt?: Date;
   emailStatus: EmailStatus;
+  /** Delivery status of the submission confirmation email (set when the assessment is completed). */
+  confirmationEmailStatus?: EmailStatus;
+  confirmationEmailSentAt?: Date;
+  confirmationEmailLastAttemptAt?: Date;
+  /** Internal concurrency token: bumped by every response write and by submission (see responseLock). */
+  responseVersion: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -50,6 +56,10 @@ const invitationSchema = new Schema<IInvitation>(
     },
     completedAt: { type: Date },
     emailStatus: { type: String, enum: EMAIL_STATUSES, default: 'Pending', required: true },
+    confirmationEmailStatus: { type: String, enum: EMAIL_STATUSES },
+    confirmationEmailSentAt: { type: Date },
+    confirmationEmailLastAttemptAt: { type: Date },
+    responseVersion: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true },
 );

@@ -197,7 +197,7 @@ describe('Review screen video status', () => {
 
     expect(screen.getByTestId('review-video-status-1')).toHaveTextContent('Video: Uploaded');
     expect(screen.getByTestId('review-video-status-4')).toHaveTextContent('Video: Not recorded');
-    const items = screen.getAllByRole('listitem');
+    const items = screen.getAllByRole('listitem', { name: /^Question \d+$/ });
     expect(within(items[0]!).getByText('Complete')).toBeInTheDocument();
     expect(within(items[3]!).getByText('Incomplete')).toBeInTheDocument();
     expect(screen.getByText('3 of 10 questions complete')).toBeInTheDocument();

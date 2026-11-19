@@ -3,6 +3,7 @@ import {
   getAssessmentHandler,
   saveResponseHandler,
   startAssessmentHandler,
+  submitAssessmentHandler,
   videoConfirmHandler,
   videoUploadUrlHandler,
   videoUrlHandler,
@@ -20,6 +21,7 @@ export function createAssessmentRouter(): Router {
   router.use(requireCandidate);
 
   router.post('/start', startAssessmentHandler);
+  router.post('/submit', submitAssessmentHandler);
   router.get('/', getAssessmentHandler);
   router.put('/questions/:questionId/response', validateBody(saveResponseSchema), saveResponseHandler);
   router.post('/questions/:questionId/video-upload-url', validateBody(videoUploadUrlSchema), videoUploadUrlHandler);

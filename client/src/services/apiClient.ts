@@ -7,7 +7,7 @@ export class ApiError extends Error {
     public readonly status: number,
     public readonly code: string,
     message: string,
-    public readonly details?: Record<string, string>,
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -34,7 +34,7 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): voi
 }
 
 interface ErrorPayload {
-  error?: { code?: string; message?: string; details?: Record<string, string> };
+  error?: { code?: string; message?: string; details?: unknown };
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {

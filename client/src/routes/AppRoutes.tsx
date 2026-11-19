@@ -8,6 +8,7 @@ import { AssessmentLayout } from '../pages/assessment/AssessmentLayout';
 import { AssessmentStartPage } from '../pages/assessment/AssessmentStartPage';
 import { QuestionPage } from '../pages/assessment/QuestionPage';
 import { ReviewPage } from '../pages/assessment/ReviewPage';
+import { SubmittedPage } from '../pages/assessment/SubmittedPage';
 import { ProtectedRoute } from './ProtectedRoute';
 
 export function AppRoutes() {
@@ -20,6 +21,7 @@ export function AppRoutes() {
           <Route index element={<AssessmentStartPage />} />
           <Route path="questions/:number" element={<QuestionPage />} />
           <Route path="review" element={<ReviewPage />} />
+          <Route path="submitted" element={<SubmittedPage />} />
           <Route path="*" element={<Navigate to="." replace />} />
         </Route>
         <Route path="admin" element={<ProtectedRoute />}>

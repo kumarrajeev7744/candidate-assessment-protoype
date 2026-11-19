@@ -3,8 +3,8 @@ import type { ZodType } from 'zod';
 import { AppError } from '../utils/AppError.js';
 
 export class RequestValidationError extends AppError {
-  constructor(public readonly details: Record<string, string>) {
-    super(400, 'Validation failed', 'VALIDATION_ERROR');
+  constructor(details: Record<string, string>) {
+    super(400, 'Validation failed', 'VALIDATION_ERROR', details);
   }
 }
 

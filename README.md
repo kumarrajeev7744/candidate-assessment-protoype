@@ -45,6 +45,7 @@ cp server/.env.example server/.env
 | server | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Local development only (or `AWS_PROFILE`). On App Runner use an IAM role | – |
 | server | `VIDEO_MAX_MB` | Maximum video size accepted | `200` |
 | server | `VIDEO_URL_EXPIRES_IN` | Lifetime of presigned upload/playback URLs | `15m` |
+| server | `COMPANY_NAME` | Optional employer name used in the submission confirmation email | – (omitted) |
 | server | `S3_ENDPOINT` | Optional S3-compatible endpoint for local testing (MinIO, LocalStack). Leave unset for AWS | – |
 
 `CLIENT_URL` (first entry) is also used to build links in emails, e.g. `{CLIENT_URL}/assessment/{token}`.
@@ -67,6 +68,8 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
    MONGODB_URI=mongodb+srv://<user>:<password>@<cluster-host>/candidate_assessment?retryWrites=true&w=majority
    ```
 5. Put it in `server/.env` (git-ignored). Never commit the real value. In AWS it will come from Secrets Manager.
+
+MongoDB must run as a **replica set** (every Atlas cluster does) because submission and response saves use transactions. A standalone local `mongod` will not work; use Atlas or a single-node replica set.
 
 The API refuses to start without a reachable database and logs the target host/database only (credentials are never logged). Indexes are created automatically by Mongoose on startup.
 
@@ -120,6 +123,7 @@ The API starts without SMTP credentials; email operations then report `Email ser
 | Endpoint | Auth | Description |
 |---|---|---|
 | `POST /api/invitations` | Bearer JWT | `{ name, email }` → 201 `{ candidate, invitation, email: { sent, error? } }`. 400 invalid input, 409 duplicate email. Email failures keep the records with `emailStatus: "Failed"` |
+| `POST /api/invitations/:id/resend-confirmation` | Bearer JWT | Retries a **failed** submission confirmation email for a completed assessment. 409 if not completed or already sent. Never changes the completion |
 | `POST /api/invitations/:id/resend` | Bearer JWT | New token + email; old link stops working; expiry reset to 7 days. 400 bad ID, 404 not found, 409 already completed, 503 email not configured |
 | `GET /api/invitations/validate/:token` | Public | 200 `{ valid, status, expiresAt }`, 404 invalid, 410 expired, 409 completed. Read-only (never changes status) |
 
@@ -141,13 +145,20 @@ Candidate APIs are authenticated with the invitation token in the `X-Assessment-
 
 Errors: 401 missing/invalid token, 409 not started or already completed, 410 expired, 400 invalid question ID, answer or video, 403 foreign object key, 404 unknown question or no video, 503 storage not configured.
 
+| `POST /api/assessment/submit` | Validates all 10 questions on the server (non-empty written answer + video `Uploaded`), then completes the assessment and emails a confirmation. 400 `ASSESSMENT_INCOMPLETE` with `details.missing[]` (`questionNumber`, `writtenMissing`, `videoMissing`), 409 already submitted, 410 expired |
+
 A question is complete when it has a saved written answer **and** a confirmed video; the candidate can only move forward from a complete question.
+
+**Submission and locking.** Validation and the status change (`In Progress` → `Completed`, `completedAt`) happen in one MongoDB transaction that also writes the invitation. Every written-answer save and video confirmation runs in a transaction that first checks the invitation is still `In Progress` and bumps its `responseVersion`. Because both always write the invitation document, they serialize: concurrent submissions produce exactly one completion, and a late autosave either lands before completion or is rejected with 409. After completion every candidate API (save, video upload/confirm, start, submit, load) returns 409.
+
+**Confirmation email.** Sent after the transaction commits; its result is stored separately from the invitation email (`confirmationEmailStatus`, `confirmationEmailSentAt`, `confirmationEmailLastAttemptAt`). A failed email never undoes the submission; recruiters can retry it with `resend-confirmation`.
 
 Frontend routes:
 
 - `/assessment/:token` – start screen (or resume where the candidate left off)
 - `/assessment/:token/questions/:number` – one question at a time: written answer with autosave (1 s debounce, saved before navigating, flushed when the tab is hidden/closed) and video recording (camera preview, 2-minute limit, preview, accept/re-record, upload with progress and retries)
-- `/assessment/:token/review` – review of all written answers, video status and playback, with Edit links
+- `/assessment/:token/review` – review of all answers, video status and playback, Edit links, questions needing attention, and **Submit Assessment** (with a confirmation dialog)
+- `/assessment/:token/submitted` – confirmation screen (name, submission time, email status); no way back into editing
 
 ## Video storage (Amazon S3)
 
@@ -168,7 +179,7 @@ The presigned PUT signs `Content-Type` and `Content-Length`, so S3 rejects uploa
 |---|---|---|
 | `admins` | email, passwordHash (bcrypt, not selected by default) | email (unique) |
 | `candidates` | name, email | email (unique), name |
-| `invitations` | candidateId, tokenHash, status, invitedAt, expiresAt (+7 days), completedAt, emailStatus | candidateId (unique), tokenHash (unique) |
+| `invitations` | candidateId, tokenHash, status, invitedAt, expiresAt (+7 days), completedAt, emailStatus, confirmationEmailStatus / SentAt / LastAttemptAt, responseVersion | candidateId (unique), tokenHash (unique) |
 | `questions` | questionNumber (1–10), questionText, isActive | questionNumber (unique) |
 | `responses` | candidateId, questionId, writtenAnswer (≤1,000 chars), video {objectKey, mimeType, sizeBytes, uploadStatus, uploadedAt} | candidateId + questionId (unique) |
 | `sharelinks` | responseId, tokenHash, recipientEmail, createdAt, expiresAt (+7 days) | responseId, tokenHash (unique) |

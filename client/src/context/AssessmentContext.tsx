@@ -12,6 +12,19 @@ import { ApiError } from '../services/apiClient';
 import * as assessmentApi from '../services/assessmentService';
 import type { AssessmentData, AssessmentQuestion, SavedResponse } from '../types/assessment';
 
+export interface SubmissionInfo {
+  completedAt: string;
+  confirmationEmailSent: boolean;
+}
+
+/** Thrown by submit() when some text could not be saved first. */
+export class UnsavedChangesError extends Error {
+  constructor() {
+    super('Some of your written answers could not be saved. Please check your connection and try again.');
+    this.name = 'UnsavedChangesError';
+  }
+}
+
 /** Tunable for tests. */
 export const assessmentSettings = { autosaveDelayMs: 1000 };
 
@@ -44,6 +57,10 @@ export interface AssessmentContextValue {
   handleFatalError: (err: unknown) => boolean;
   reload: () => void;
   start: () => Promise<void>;
+  /** Saves pending text, then submits. Throws ApiError / UnsavedChangesError on failure. */
+  submit: () => Promise<SubmissionInfo>;
+  /** Set after a successful submission in this browser session. */
+  submission: SubmissionInfo | null;
   updateDraft: (questionId: string, text: string) => void;
   /** Saves immediately (waiting for any in-flight save of the same question). Resolves false on failure. */
   saveNow: (questionId: string) => Promise<boolean>;
@@ -77,6 +94,8 @@ export function AssessmentProvider({ token, children }: { token: string; childre
   const [saveStatus, setSaveStatus] = useState<Record<string, SaveStatus>>({});
   const [saveError, setSaveError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [submission, setSubmission] = useState<SubmissionInfo | null>(null);
+  const submittedRef = useRef(false);
 
   const draftsRef = useRef<Record<string, string>>({});
   const savedRef = useRef<Record<string, string>>({});
@@ -129,6 +148,7 @@ export function AssessmentProvider({ token, children }: { token: string; childre
 
   const performSave = useCallback(
     async (questionId: string): Promise<boolean> => {
+      if (submittedRef.current) return true; // the assessment is locked; nothing more to save
       const text = draftsRef.current[questionId] ?? '';
       if (text === (savedRef.current[questionId] ?? '')) {
         setSaveStatus((prev) =>
@@ -155,6 +175,7 @@ export function AssessmentProvider({ token, children }: { token: string; childre
         }
         return true;
       } catch (err) {
+        if (submittedRef.current) return true;
         const fatal = fatalFromError(err);
         if (fatal) setLoad(fatal);
         setStatus(questionId, 'error');
@@ -187,6 +208,7 @@ export function AssessmentProvider({ token, children }: { token: string; childre
 
   const schedule = useCallback(
     (questionId: string) => {
+      if (submittedRef.current) return;
       const existing = timersRef.current.get(questionId);
       if (existing !== undefined) window.clearTimeout(existing);
       const timer = window.setTimeout(() => {
@@ -240,6 +262,25 @@ export function AssessmentProvider({ token, children }: { token: string; childre
       window.removeEventListener('pagehide', flush);
     };
   }, [saveNow]);
+
+  const submit = useCallback(async (): Promise<SubmissionInfo> => {
+    // Make sure every written answer is stored before the server validates the assessment.
+    const results = await Promise.all(Object.keys(draftsRef.current).map((id) => saveNow(id)));
+    if (results.some((ok) => !ok)) throw new UnsavedChangesError();
+
+    const result = await assessmentApi.submitAssessment(token);
+    submittedRef.current = true;
+    for (const t of timersRef.current.values()) window.clearTimeout(t);
+    timersRef.current.clear();
+    const info: SubmissionInfo = {
+      completedAt: result.assessment.completedAt,
+      confirmationEmailSent: result.confirmationEmail.sent,
+    };
+    setSubmission(info);
+    setSaveStatus({});
+    setData((prev) => prev && { ...prev, assessment: { ...prev.assessment, status: 'Completed' } });
+    return info;
+  }, [token, saveNow]);
 
   const hasUnsavedChanges = Object.values(saveStatus).some((s) => s === 'unsaved' || s === 'saving' || s === 'error');
 
@@ -296,6 +337,8 @@ export function AssessmentProvider({ token, children }: { token: string; childre
       handleFatalError,
       reload,
       start,
+      submit,
+      submission,
       updateDraft,
       saveNow,
       hasUnsavedChanges,
@@ -315,6 +358,8 @@ export function AssessmentProvider({ token, children }: { token: string; childre
       handleFatalError,
       reload,
       start,
+      submit,
+      submission,
       updateDraft,
       saveNow,
       hasUnsavedChanges,

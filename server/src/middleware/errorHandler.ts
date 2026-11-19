@@ -5,7 +5,7 @@ import { logger } from '../utils/logger.js';
 import { RequestValidationError } from './validateBody.js';
 
 interface ErrorBody {
-  error: { code: string; message: string; details?: Record<string, string> };
+  error: { code: string; message: string; details?: unknown };
 }
 
 function isBodyParserError(err: unknown): err is { status: number; type: string } {
@@ -25,7 +25,8 @@ export function toErrorResponse(err: unknown): { status: number; body: ErrorBody
     };
   }
   if (err instanceof AppError) {
-    return { status: err.statusCode, body: { error: { code: err.code, message: err.message } } };
+    const error = { code: err.code, message: err.message, ...(err.details !== undefined ? { details: err.details } : {}) };
+    return { status: err.statusCode, body: { error } };
   }
   if (isBodyParserError(err) && err.type === 'entity.parse.failed') {
     return { status: 400, body: { error: { code: 'INVALID_JSON', message: 'Malformed JSON body' } } };
