@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   createInvitationHandler,
+  listInvitationsHandler,
   resendConfirmationHandler,
   resendInvitationHandler,
   validateInvitationHandler,
@@ -17,6 +18,7 @@ export function createInvitationRouter(): Router {
   router.get('/validate/:token', createPublicRateLimiter(), validateInvitationHandler);
 
   // Recruiter only.
+  router.get('/', requireAuth, listInvitationsHandler);
   router.post('/', requireAuth, validateBody(createInvitationSchema), createInvitationHandler);
   router.post('/:id/resend', requireAuth, resendInvitationHandler);
   router.post('/:id/resend-confirmation', requireAuth, resendConfirmationHandler);

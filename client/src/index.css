@@ -186,3 +186,40 @@ h2 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; }
 .dialog h2 { margin-top: 0; }
 .dialog-body p { color: var(--color-text); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem; }
+
+/* Recruiter dashboard */
+.app-main:has(.dashboard) { max-width: 1240px; }
+.dashboard-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.dashboard-header h1 { margin: 0; }
+.dashboard-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.search-field { max-width: 420px; margin: 1.25rem 0 1rem; }
+.feedback { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
+.feedback .button-link-plain { text-decoration: none; font-size: 1.2rem; line-height: 1; }
+.table-wrap { overflow-x: auto; border: 1px solid #e4e9f0; border-radius: 8px; }
+.table-wrap[aria-busy='true'] { opacity: 0.6; }
+.candidate-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.candidate-table th, .candidate-table td { text-align: left; padding: 0.65rem 0.75rem; border-bottom: 1px solid #e4e9f0; vertical-align: top; }
+.candidate-table th { background: #f8fafc; font-weight: 600; white-space: nowrap; }
+.candidate-table tbody tr:last-child td { border-bottom: none; }
+.candidate-table td { white-space: nowrap; }
+.candidate-table .cell-email { white-space: normal; overflow-wrap: anywhere; min-width: 12rem; }
+.status-cell { display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
+.status-note { flex-basis: 100%; font-size: 0.78rem; color: #b42318; }
+.badge-info { background: #eff8ff; color: #175cd3; }
+.badge-danger { background: #fef3f2; color: #b42318; }
+.row-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.empty-state { text-align: center; padding: 2rem 1rem; border: 1px dashed #c4ccd6; border-radius: 8px; }
+.pagination { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 0.75rem; font-size: 0.85rem; color: var(--color-muted); flex-wrap: wrap; }
+.form-error p { margin: 0 0 0.5rem; color: inherit; }
+
+/* Narrow screens: each candidate row becomes a stacked card with labelled fields. */
+@media (max-width: 760px) {
+  .table-wrap { border: none; overflow: visible; }
+  .candidate-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .candidate-table, .candidate-table tbody, .candidate-table tr, .candidate-table td { display: block; width: 100%; }
+  .candidate-table tr { border: 1px solid #e4e9f0; border-radius: 8px; margin-bottom: 0.75rem; padding: 0.5rem 0.75rem; }
+  .candidate-table td { border: none; padding: 0.3rem 0; white-space: normal; display: grid; grid-template-columns: 8.5rem 1fr; gap: 0.5rem; }
+  .candidate-table td::before { content: attr(data-label); font-weight: 600; color: var(--color-muted); font-size: 0.8rem; }
+  .candidate-table .cell-name { font-weight: 600; font-size: 1rem; }
+  .candidate-table .cell-email { min-width: 0; }
+}

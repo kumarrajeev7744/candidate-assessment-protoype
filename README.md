@@ -97,6 +97,15 @@ The seed is idempotent: if the admin already exists it is left unchanged (the pa
 
 Log in at `http://localhost:5173/admin/login`.
 
+### Recruiter dashboard (`/admin/dashboard`)
+
+- Candidate table: name, email, invitation, expiry and completion dates, status (Invited / In Progress / Completed, plus an Expired badge and email-failure notes) and actions. On phones each row is shown as a card.
+- Search by name or email (server-side, debounced), Refresh, pagination (50 per page), loading / empty / error states.
+- **Create Candidate** dialog (validated in the browser and on the server; duplicates rejected) – sends the invitation email.
+- **Resend invitation** (not for completed candidates; asks for confirmation because the previous link stops working).
+- **Resend confirmation** for completed candidates whose confirmation email failed.
+- **Report** opens `/admin/candidates/:candidateId` (placeholder until the candidate report is built).
+
 | Endpoint | Auth | Description |
 |---|---|---|
 | `POST /api/auth/login` | – | `{ email, password }` → `{ token, expiresAt, admin }`. 400 invalid body, 401 bad credentials, 429 rate limited |
@@ -122,6 +131,7 @@ The API starts without SMTP credentials; email operations then report `Email ser
 
 | Endpoint | Auth | Description |
 |---|---|---|
+| `GET /api/invitations?search=&page=&limit=` | Bearer JWT | Recruiter candidate list, newest invitations first. `search` matches name or email (case-insensitive, literal, ≤ 100 chars); `page` ≥ 1, `limit` 1–100 (default 50). Returns `{ items, pagination: { page, limit, total, totalPages }, search }`; each item has the candidate, status, invitation/expiry/completion dates, `isExpired`, invitation and confirmation email statuses, and `canResendInvitation` / `canResendConfirmation`. No tokens or internal fields |
 | `POST /api/invitations` | Bearer JWT | `{ name, email }` → 201 `{ candidate, invitation, email: { sent, error? } }`. 400 invalid input, 409 duplicate email. Email failures keep the records with `emailStatus: "Failed"` |
 | `POST /api/invitations/:id/resend-confirmation` | Bearer JWT | Retries a **failed** submission confirmation email for a completed assessment. 409 if not completed or already sent. Never changes the completion |
 | `POST /api/invitations/:id/resend` | Bearer JWT | New token + email; old link stops working; expiry reset to 7 days. 400 bad ID, 404 not found, 409 already completed, 503 email not configured |

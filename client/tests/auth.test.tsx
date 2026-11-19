@@ -49,8 +49,8 @@ describe('Login page', () => {
     expect(screen.getByRole('button', { name: 'Signing in…' })).toBeDisabled();
 
     await act(async () => release());
-    expect(await screen.findByRole('heading', { name: 'Recruiter Dashboard' })).toBeInTheDocument();
-    expect(screen.getByText('Signed in as recruiter@example.com.')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Candidates' })).toBeInTheDocument();
+    expect(screen.getByRole('banner')).toHaveTextContent('recruiter@example.com');
     expect(getStoredSession()?.token).toBe('jwt-token');
 
     const [, init] = fetchMock.mock.calls[0]!;
@@ -93,7 +93,7 @@ describe('Login page', () => {
     storeSession({ token: 'valid', expiresAt: futureIso() });
     mockApi({ 'GET /auth/me': () => ({ status: 200, body: { admin: ADMIN } }) });
     renderApp('/admin/login');
-    expect(await screen.findByRole('heading', { name: 'Recruiter Dashboard' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Candidates' })).toBeInTheDocument();
   });
 });
 
@@ -102,14 +102,14 @@ describe('ProtectedRoute', () => {
     mockApi({});
     renderApp('/admin/dashboard');
     expect(screen.getByRole('heading', { name: 'Recruiter login' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Recruiter Dashboard' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Candidates' })).not.toBeInTheDocument();
   });
 
   it('returns the user to the originally requested page after login', async () => {
     mockApi({ 'POST /auth/login': loginOk });
     renderApp('/admin');
     await fillAndSubmit('recruiter@example.com', 'Correct-Password-1');
-    expect(await screen.findByRole('heading', { name: 'Recruiter Dashboard' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Candidates' })).toBeInTheDocument();
   });
 });
 
@@ -120,7 +120,7 @@ describe('Session restore', () => {
     renderApp('/admin/dashboard');
 
     expect(screen.getByRole('status')).toHaveTextContent('Checking your session');
-    expect(await screen.findByRole('heading', { name: 'Recruiter Dashboard' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Candidates' })).toBeInTheDocument();
     const [, init] = fetchMock.mock.calls[0]!;
     expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer valid-token');
   });
@@ -153,7 +153,7 @@ describe('Session restore', () => {
     storeSession({ token: 'short-lived', expiresAt: futureIso(5_000) });
     mockApi({ 'GET /auth/me': () => ({ status: 200, body: { admin: ADMIN } }) });
     renderApp('/admin/dashboard');
-    expect(await screen.findByRole('heading', { name: 'Recruiter Dashboard' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Candidates' })).toBeInTheDocument();
 
     await act(async () => {
       vi.advanceTimersByTime(6_000);
@@ -171,7 +171,7 @@ describe('Logout', () => {
       'POST /auth/logout': () => ({ status: 200, body: { message: 'Logged out' } }),
     });
     renderApp('/admin/dashboard');
-    await screen.findByRole('heading', { name: 'Recruiter Dashboard' });
+    await screen.findByRole('heading', { name: 'Candidates' });
     expect(screen.getByRole('banner')).toHaveTextContent('recruiter@example.com');
 
     await userEvent.click(screen.getByRole('button', { name: 'Log out' }));
@@ -182,6 +182,6 @@ describe('Logout', () => {
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true);
 
     // Protected pages are no longer accessible.
-    expect(screen.queryByText(/Signed in as/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Candidates' })).not.toBeInTheDocument();
   });
 });

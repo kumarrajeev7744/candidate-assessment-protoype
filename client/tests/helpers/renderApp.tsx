@@ -14,6 +14,14 @@ export function renderApp(path = '/') {
   );
 }
 
+/** Responses for requests most tests do not care about (e.g. the dashboard's candidate list). */
+const DEFAULT_ROUTES: Record<string, Handler> = {
+  'GET /invitations': () => ({
+    status: 200,
+    body: { items: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 1 }, search: '' },
+  }),
+};
+
 type Handler = (init: RequestInit | undefined) => { status: number; body: unknown } | Promise<{ status: number; body: unknown }>;
 
 /**
@@ -25,7 +33,7 @@ export function mockApi(routes: Record<string, Handler>) {
     const url = new URL(String(input));
     const path = url.pathname.replace(/^\/api/, '');
     const key = `${init?.method ?? 'GET'} ${path}`;
-    const handler = routes[key];
+    const handler = routes[key] ?? DEFAULT_ROUTES[key];
     if (!handler) throw new Error(`Unexpected request: ${key}`);
     const { status, body } = await handler(init);
     return new Response(JSON.stringify(body), {
