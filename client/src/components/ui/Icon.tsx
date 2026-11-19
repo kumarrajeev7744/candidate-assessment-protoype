@@ -18,11 +18,21 @@ const PATHS = {
   lock: 'M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3',
   eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   logout: 'M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10',
+  moreHorizontal: 'M5 12h.01M12 12h.01M19 12h.01',
 } as const;
 
 export type IconName = keyof typeof PATHS;
 
 export function Icon({ name, size = 18, className }: { name: IconName; size?: number; className?: string }) {
+  if (name === 'moreHorizontal') {
+    return (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+        <circle cx="5" cy="12" r="2" />
+        <circle cx="12" cy="12" r="2" />
+        <circle cx="19" cy="12" r="2" />
+      </svg>
+    );
+  }
   return (
     <svg
       className={className}

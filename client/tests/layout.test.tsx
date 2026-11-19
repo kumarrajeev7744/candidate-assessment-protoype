@@ -12,7 +12,7 @@ describe('App header', () => {
     expect(within(banner).queryByRole('button', { name: /Log out/ })).not.toBeInTheDocument();
   });
 
-  it('marks the Candidates section active on the dashboard and on candidate reports', async () => {
+  it('marks the Dashboard link active on the dashboard and on candidate reports', async () => {
     storeSession({ token: 'jwt', expiresAt: futureIso() });
     mockApi({
       'GET /auth/me': () => ({ status: 200, body: { admin: ADMIN } }),
@@ -20,7 +20,7 @@ describe('App header', () => {
     });
     renderApp(`/admin/candidates/${'c'.repeat(24)}`);
     const nav = await screen.findByRole('navigation', { name: 'Recruiter' });
-    expect(within(nav).getByRole('link', { name: 'Candidates' })).toHaveAttribute('aria-current', 'page');
+    expect(within(nav).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page');
     expect(within(screen.getByRole('banner')).getByRole('link', { name: 'Candidate Assessment Platform' })).toHaveAttribute(
       'href',
       '/admin/dashboard',

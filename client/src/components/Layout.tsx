@@ -10,8 +10,8 @@ export function Layout() {
   // even if this browser tab also holds a recruiter session.
   const isPublicFlow = pathname.startsWith('/assessment/') || pathname.startsWith('/shared-response/');
   const signedIn = status === 'authenticated' && !isPublicFlow;
-  // Candidate reports belong to the Candidates section too.
-  const candidatesActive = pathname.startsWith('/admin/dashboard') || pathname.startsWith('/admin/candidates');
+  // Candidate reports are part of the dashboard section too.
+  const dashboardActive = pathname.startsWith('/admin/dashboard') || pathname.startsWith('/admin/candidates');
 
   function handleLogout() {
     logout();
@@ -38,10 +38,10 @@ export function Layout() {
               <nav className="app-nav" aria-label="Recruiter">
                 <Link
                   to="/admin/dashboard"
-                  className={candidatesActive ? 'app-nav-link active' : 'app-nav-link'}
-                  aria-current={candidatesActive ? 'page' : undefined}
+                  className={dashboardActive ? 'app-nav-link active' : 'app-nav-link'}
+                  aria-current={dashboardActive ? 'page' : undefined}
                 >
-                  Candidates
+                  Dashboard
                 </Link>
               </nav>
               <div className="app-user">

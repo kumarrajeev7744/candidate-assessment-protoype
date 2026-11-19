@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { CreateCandidateDialog } from '../components/dashboard/CreateCandidateDialog';
 import { StatusBadge } from '../components/dashboard/StatusBadge';
 import { Icon } from '../components/ui/Icon';
+import { ActionsMenu, type MenuAction } from '../components/ui/ActionsMenu';
 
 /** Tunable for tests. */
 export const dashboardSettings = { searchDebounceMs: 300, pageSize: 50 };
@@ -140,6 +141,28 @@ export function DashboardPage() {
     }
   }
 
+  /** Secondary row actions shown in the "⋯" menu (only those that apply to this candidate). */
+  function rowActions(item: CandidateListItem): MenuAction[] {
+    const actions: MenuAction[] = [];
+    if (item.canResendInvitation) {
+      actions.push({
+        label: 'Resend invitation',
+        ariaLabel: `Resend invitation to ${item.candidate.name}`,
+        icon: 'mail',
+        onSelect: () => setResendTarget(item),
+      });
+    }
+    if (item.canResendConfirmation) {
+      actions.push({
+        label: 'Resend confirmation email',
+        ariaLabel: `Resend confirmation email to ${item.candidate.name}`,
+        icon: 'checkCircle',
+        onSelect: () => void handleResendConfirmation(item),
+      });
+    }
+    return actions;
+  }
+
   const items = data?.items ?? [];
   const pagination = data?.pagination;
   const firstLoad = loading && !data;
@@ -269,27 +292,16 @@ export function DashboardPage() {
                       >
                         Report
                       </Link>
-                      {item.canResendInvitation && (
-                        <button
-                          type="button"
-                          className="button-secondary button-small"
-                          disabled={busyId === item.id}
-                          onClick={() => setResendTarget(item)}
-                          aria-label={`Resend invitation to ${item.candidate.name}`}
-                        >
-                          Resend invitation
-                        </button>
-                      )}
-                      {item.canResendConfirmation && (
-                        <button
-                          type="button"
-                          className="button-secondary button-small"
-                          disabled={busyId === item.id}
-                          onClick={() => void handleResendConfirmation(item)}
-                          aria-label={`Resend confirmation email to ${item.candidate.name}`}
-                        >
-                          {busyId === item.id ? 'Sending…' : 'Resend confirmation'}
-                        </button>
+                      <ActionsMenu
+                        label={`More actions for ${item.candidate.name}`}
+                        disabled={busyId === item.id}
+                        actions={rowActions(item)}
+                      />
+                      {busyId === item.id && (
+                        <span className="row-busy">
+                          <span className="spinner" aria-hidden="true" />
+                          Sending…
+                        </span>
                       )}
                     </div>
                   </td>
