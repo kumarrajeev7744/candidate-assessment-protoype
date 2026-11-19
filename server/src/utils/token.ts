@@ -12,3 +12,10 @@ export function generateToken(): string {
 export function hashToken(token: string): string {
   return createHash('sha256').update(token, 'utf8').digest('hex');
 }
+
+/** Raw tokens are 32 random bytes in base64url: exactly 43 URL-safe characters. */
+export const RAW_TOKEN_FORMAT = /^[A-Za-z0-9_-]{43}$/;
+
+export function isWellFormedToken(value: unknown): value is string {
+  return typeof value === 'string' && RAW_TOKEN_FORMAT.test(value);
+}

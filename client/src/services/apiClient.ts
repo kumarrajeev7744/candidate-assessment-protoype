@@ -19,6 +19,10 @@ interface RequestOptions {
   body?: unknown;
   /** Attach the stored admin JWT and treat 401 responses as an expired session. */
   auth?: boolean;
+  /** Candidate invitation token, sent as X-Assessment-Token (separate from recruiter auth). */
+  assessmentToken?: string;
+  /** Let the request finish even if the page is being closed (small bodies only). */
+  keepalive?: boolean;
 }
 
 type UnauthorizedHandler = () => void;
@@ -40,6 +44,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     const session = getStoredSession();
     if (session) headers.Authorization = `Bearer ${session.token}`;
   }
+  if (options.assessmentToken) headers['X-Assessment-Token'] = options.assessmentToken;
 
   let response: Response;
   try {
@@ -47,6 +52,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       method: options.method ?? 'GET',
       headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      keepalive: options.keepalive,
     });
   } catch {
     throw new ApiError(
