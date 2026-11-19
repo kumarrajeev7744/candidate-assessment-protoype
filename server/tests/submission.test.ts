@@ -11,6 +11,7 @@ import { seedQuestions } from '../src/services/questionSeedService.js';
 import { signAdminToken } from '../src/utils/jwt.js';
 import { generateToken, hashToken } from '../src/utils/token.js';
 import { config } from '../src/config/env.js';
+import { videoKeyPrefix } from '../src/services/videoService.js';
 
 useTestDatabase();
 
@@ -55,7 +56,7 @@ async function addResponses(
       ...(videoStatus
         ? {
             video: {
-              objectKey: `videos/${fx.candidateId}/${questionIds[i]}/1700000000000-${'a'.repeat(24)}.webm`,
+              objectKey: `${videoKeyPrefix(fx.candidateId.toString(), questionIds[i]!)}1700000000000-${'a'.repeat(24)}.webm`,
               mimeType: 'video/webm',
               sizeBytes: 1000,
               uploadStatus: videoStatus,
@@ -233,7 +234,7 @@ describe('Locking after completion', () => {
 
   it('rejects video upload URLs, confirmations and replacement', async () => {
     const fx = await completedFixture();
-    const key = `videos/${fx.candidateId}/${questionIds[0]}/1800000000000-${'b'.repeat(24)}.webm`;
+    const key = `${videoKeyPrefix(fx.candidateId.toString(), questionIds[0]!)}1800000000000-${'b'.repeat(24)}.webm`;
     s3.put(key);
     const url = await request(app)
       .post(`/api/assessment/questions/${questionIds[0]}/video-upload-url`)
@@ -260,7 +261,7 @@ describe('Locking after completion', () => {
   it('rejects a video confirmation that races with completion', async () => {
     const fx = await createCandidate();
     await addResponses(fx);
-    const key = `videos/${fx.candidateId}/${questionIds[1]}/1800000000000-${'c'.repeat(24)}.webm`;
+    const key = `${videoKeyPrefix(fx.candidateId.toString(), questionIds[1]!)}1800000000000-${'c'.repeat(24)}.webm`;
     s3.put(key);
     const [submitRes, confirmRes] = await Promise.all([
       submit(fx.token),

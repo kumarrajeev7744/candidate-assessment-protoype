@@ -1,9 +1,10 @@
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { Types } from 'mongoose';
 import { config } from '../config/env.js';
 import { Question, Response } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
+import { getJwtSecret } from '../utils/jwt.js';
 import type { CandidateSession } from '../types/assessment.js';
 import { getVideoStorage } from './storage/videoStorage.js';
 import { toResponseDto, type SavedResponseDto } from './assessmentService.js';
@@ -21,8 +22,22 @@ export function normalizeVideoMimeType(mimeType: string): string | null {
   return base in ALLOWED_VIDEO_TYPES ? base : null;
 }
 
+/**
+ * Opaque, deterministic folder for a candidate's answer to one question:
+ * HMAC(secret, candidateId:questionId). Presigned URLs contain the object key, so the key must not
+ * reveal internal IDs (e.g. to a hiring manager viewing a shared response), while the server can
+ * still verify that a key belongs to the calling candidate and question.
+ */
+export function videoKeyPrefix(candidateId: string, questionId: string): string {
+  const digest = createHmac('sha256', getJwtSecret())
+    .update(`video-key:${candidateId.toLowerCase()}:${questionId.toLowerCase()}`)
+    .digest('hex')
+    .slice(0, 32);
+  return `videos/${digest}/`;
+}
+
 function keyPrefix(session: CandidateSession, questionId: string): string {
-  return `videos/${session.candidateId.toString()}/${questionId}/`;
+  return videoKeyPrefix(session.candidateId.toString(), questionId);
 }
 
 /** Server-generated, unguessable object key scoped to the candidate and question. */
@@ -31,7 +46,7 @@ export function buildVideoObjectKey(session: CandidateSession, questionId: strin
   return `${keyPrefix(session, questionId)}${Date.now()}-${randomBytes(12).toString('hex')}.${ext}`;
 }
 
-const OBJECT_KEY_PATTERN = /^videos\/[a-f0-9]{24}\/[a-f0-9]{24}\/\d{13}-[a-f0-9]{24}\.(webm|mp4)$/;
+const OBJECT_KEY_PATTERN = /^videos\/[a-f0-9]{32}\/\d{13}-[a-f0-9]{24}\.(webm|mp4)$/;
 
 function assertInProgress(session: CandidateSession): void {
   if (session.status !== 'In Progress') {

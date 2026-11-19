@@ -1,7 +1,7 @@
 import { Schema, model, type HydratedDocument, type Types } from 'mongoose';
 import { addDays } from '../utils/dates.js';
 import { EMAIL_REGEX, MAX_EMAIL_LENGTH } from '../utils/validation.js';
-import { SHARE_LINK_EXPIRY_DAYS } from './constants.js';
+import { EMAIL_STATUSES, SHARE_LINK_EXPIRY_DAYS, type EmailStatus } from './constants.js';
 
 export interface IShareLink {
   responseId: Types.ObjectId;
@@ -10,6 +10,10 @@ export interface IShareLink {
   recipientEmail: string;
   createdAt: Date;
   expiresAt: Date;
+  /** Delivery of the share email. Only links whose email was Sent can be opened. */
+  emailStatus: EmailStatus;
+  emailSentAt?: Date;
+  emailLastAttemptAt?: Date;
 }
 
 const shareLinkSchema = new Schema<IShareLink>(
@@ -34,6 +38,9 @@ const shareLinkSchema = new Schema<IShareLink>(
       maxlength: MAX_EMAIL_LENGTH,
       match: [EMAIL_REGEX, 'Recipient email is invalid'],
     },
+    emailStatus: { type: String, enum: EMAIL_STATUSES, default: 'Pending', required: true },
+    emailSentAt: { type: Date },
+    emailLastAttemptAt: { type: Date },
     // Expired links are kept (no TTL index); expiry is checked when the link is opened.
     expiresAt: {
       type: Date,

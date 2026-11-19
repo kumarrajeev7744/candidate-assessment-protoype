@@ -43,3 +43,19 @@ export const listInvitationsQuerySchema = z.object({
 });
 
 export type ListInvitationsQuery = z.infer<typeof listInvitationsQuerySchema>;
+
+export const shareResponseSchema = z.object({
+  candidateId: z
+    .string({ error: 'candidateId is required' })
+    .trim()
+    .regex(/^[a-f0-9]{24}$/i, 'candidateId is invalid'),
+  recipientEmail: z
+    .string({ error: 'Recipient email is required' })
+    .trim()
+    .min(1, 'Recipient email is required')
+    .max(254, 'Recipient email is too long')
+    .pipe(z.email({ error: 'Recipient email is invalid' }))
+    .transform((v) => v.toLowerCase()),
+});
+
+export type ShareResponseInput = z.infer<typeof shareResponseSchema>;
