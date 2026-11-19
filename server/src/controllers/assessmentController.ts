@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import * as assessmentService from '../services/assessmentService.js';
 import * as videoService from '../services/videoService.js';
+import * as submissionService from '../services/submissionService.js';
 import type {
   SaveResponseInput,
   VideoConfirmInput,
@@ -46,4 +47,8 @@ export async function videoUrlHandler(req: Request<{ questionId: string }>, res:
   const result = await videoService.getVideoPlaybackUrl(req.candidateSession!, req.params.questionId);
   res.set('Cache-Control', 'no-store');
   res.status(200).json(result);
+}
+
+export async function submitAssessmentHandler(req: Request, res: Response): Promise<void> {
+  res.status(200).json(await submissionService.submitAssessment(req.candidateSession!));
 }

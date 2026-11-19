@@ -6,12 +6,13 @@ import { formatDateTime } from '../../utils/format';
 import { resumePath } from './resumePosition';
 
 export function AssessmentStartPage() {
-  const { token, data, firstIncompleteNumber, start, reload } = useAssessment();
+  const { token, data, firstIncompleteNumber, start, reload, submission } = useAssessment();
   const navigate = useNavigate();
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!data) return null;
+  if (submission) return <Navigate to="submitted" replace />;
   const { candidate, assessment } = data;
 
   // Returning candidate: continue where they left off.

@@ -184,14 +184,14 @@ describe('Review screen', () => {
     renderApp(`${BASE}/review`);
 
     expect(await screen.findByRole('heading', { name: 'Review your answers' })).toBeInTheDocument();
-    const items = screen.getAllByRole('listitem');
+    const items = screen.getAllByRole('listitem', { name: /^Question \d+$/ });
     expect(items).toHaveLength(10);
     QUESTIONS.forEach((q, i) => expect(within(items[i]!).getByText(q.questionText)).toBeInTheDocument());
     expect(within(items[0]!).getByText('Alpha answer')).toBeInTheDocument();
     expect(within(items[3]!).getByText('Delta answer')).toBeInTheDocument();
     expect(within(items[1]!).getByText('No written answer yet')).toBeInTheDocument();
     expect(screen.getAllByText('No written answer yet')).toHaveLength(8);
-    expect(screen.getByText('9 questions still need a written answer and a video.')).toBeInTheDocument();
+    expect(screen.getByText(/completed ·/).parentElement).toHaveTextContent('1 completed · 9 incomplete');
     expect(screen.getByText('1 of 10 questions complete')).toBeInTheDocument();
   });
 

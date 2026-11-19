@@ -17,3 +17,8 @@ export async function validateInvitationHandler(req: Request<{ token: string }>,
   res.set('Cache-Control', 'no-store');
   res.status(200).json(result);
 }
+
+export async function resendConfirmationHandler(req: Request<{ id: string }>, res: Response): Promise<void> {
+  const result = await invitationService.resendConfirmationEmail(req.params.id);
+  res.status(200).json(result);
+}

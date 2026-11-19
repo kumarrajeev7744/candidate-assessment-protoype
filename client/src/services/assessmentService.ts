@@ -1,5 +1,5 @@
 import { apiRequest } from './apiClient';
-import type { AssessmentData, SavedResponse, StartAssessmentResult } from '../types/assessment';
+import type { AssessmentData, SavedResponse, StartAssessmentResult, SubmitAssessmentResult } from '../types/assessment';
 
 export function fetchAssessment(token: string): Promise<AssessmentData> {
   return apiRequest<AssessmentData>('/assessment', { assessmentToken: token });
@@ -15,4 +15,8 @@ export async function saveWrittenAnswer(token: string, questionId: string, writt
     { method: 'PUT', body: { writtenAnswer }, assessmentToken: token, keepalive: true },
   );
   return response;
+}
+
+export function submitAssessment(token: string): Promise<SubmitAssessmentResult> {
+  return apiRequest<SubmitAssessmentResult>('/assessment/submit', { method: 'POST', assessmentToken: token });
 }

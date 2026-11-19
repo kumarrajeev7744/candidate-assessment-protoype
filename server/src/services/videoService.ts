@@ -7,6 +7,7 @@ import { logger } from '../utils/logger.js';
 import type { CandidateSession } from '../types/assessment.js';
 import { getVideoStorage } from './storage/videoStorage.js';
 import { toResponseDto, type SavedResponseDto } from './assessmentService.js';
+import { withResponseWriteLock } from './responseLock.js';
 
 /** Container formats browsers record with MediaRecorder (Chrome/Firefox: WebM, Safari: MP4). */
 export const ALLOWED_VIDEO_TYPES: Record<string, string> = {
@@ -117,12 +118,6 @@ export async function confirmVideoUpload(
   }
 
   const filter = { candidateId: session.candidateId, questionId: new Types.ObjectId(qid) };
-  const existing = await Response.findOne(filter).select('video').lean();
-  const previousKey = existing?.video?.objectKey;
-  if (previousKey === objectKey && existing?.video?.uploadStatus === 'Uploaded') {
-    return toResponseDto((await Response.findOne(filter).lean())!); // idempotent re-confirm
-  }
-
   const video = {
     objectKey,
     mimeType: expectedType,
@@ -130,19 +125,29 @@ export async function confirmVideoUpload(
     uploadStatus: 'Uploaded' as const,
     uploadedAt: new Date(),
   };
-  const update = () =>
-    Response.findOneAndUpdate(
+  // Locked write: a video can never be attached or replaced after the assessment is submitted.
+  const { saved, previousKey, unchanged } = await withResponseWriteLock(session, async (dbSession) => {
+    const existing = await Response.findOne(filter).select('video').session(dbSession).lean();
+    const previous = existing?.video?.objectKey;
+    if (previous === objectKey && existing?.video?.uploadStatus === 'Uploaded') {
+      const current = await Response.findOne(filter).session(dbSession).lean();
+      return { saved: current, previousKey: previous, unchanged: true }; // idempotent re-confirm
+    }
+    const updated = await Response.findOneAndUpdate(
       filter,
       { $set: { video }, $setOnInsert: filter },
-      { upsert: true, returnDocument: 'after', runValidators: true, setDefaultsOnInsert: true, lean: true },
+      {
+        upsert: true,
+        returnDocument: 'after',
+        runValidators: true,
+        setDefaultsOnInsert: true,
+        lean: true,
+        session: dbSession,
+      },
     );
-  let saved;
-  try {
-    saved = await update();
-  } catch (err) {
-    if ((err as { code?: number }).code !== 11000) throw err;
-    saved = await update();
-  }
+    return { saved: updated, previousKey: previous, unchanged: false };
+  });
+  if (unchanged) return toResponseDto(saved!);
   logger.info('Video upload confirmed', { questionId: qid, sizeBytes: head.sizeBytes, replaced: Boolean(previousKey) });
 
   if (previousKey && previousKey !== objectKey) {

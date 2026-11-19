@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { Types, type ClientSession } from 'mongoose';
 import {
   Candidate,
   Invitation,
@@ -11,6 +11,7 @@ import {
 } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
+import { withResponseWriteLock } from './responseLock.js';
 import type { CandidateSession } from '../types/assessment.js';
 
 export const VIDEO_MAX_SECONDS = 120;
@@ -63,8 +64,11 @@ async function loadCandidate(session: CandidateSession) {
   return { name: candidate.name, email: candidate.email };
 }
 
-async function loadActiveQuestions() {
-  const questions = await Question.find({ isActive: true }).sort({ questionNumber: 1 }).lean();
+export async function loadActiveQuestions(dbSession?: ClientSession) {
+  const questions = await Question.find({ isActive: true })
+    .sort({ questionNumber: 1 })
+    .session(dbSession ?? null)
+    .lean();
   if (questions.length !== TOTAL_QUESTIONS) {
     logger.error('Assessment questions misconfigured', { activeQuestions: questions.length });
     throw new AppError(503, 'The assessment is not available right now. Please try again later.', 'ASSESSMENT_UNAVAILABLE');
@@ -163,21 +167,21 @@ export async function saveWrittenAnswer(
   if (!question) throw new AppError(404, 'Question not found.', 'QUESTION_NOT_FOUND');
 
   const filter = { candidateId: session.candidateId, questionId: new Types.ObjectId(questionId) };
-  const upsert = () =>
+  // Locked write: rejected if the assessment was submitted (or expired) in the meantime.
+  const saved = await withResponseWriteLock(session, (dbSession) =>
     Response.findOneAndUpdate(
       filter,
       { $set: { writtenAnswer }, $setOnInsert: filter },
-      { upsert: true, returnDocument: 'after', runValidators: true, setDefaultsOnInsert: true, lean: true },
-    );
-
-  let saved;
-  try {
-    saved = await upsert();
-  } catch (err) {
-    // Two simultaneous first saves can race on the unique index; the retry becomes an update.
-    if ((err as { code?: number }).code !== 11000) throw err;
-    saved = await upsert();
-  }
+      {
+        upsert: true,
+        returnDocument: 'after',
+        runValidators: true,
+        setDefaultsOnInsert: true,
+        lean: true,
+        session: dbSession,
+      },
+    ),
+  );
   if (!saved) throw new AppError(500, 'Could not save the response.', 'SAVE_FAILED');
   return toResponseDto(saved);
 }

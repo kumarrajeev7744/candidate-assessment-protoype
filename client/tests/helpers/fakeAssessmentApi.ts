@@ -58,6 +58,11 @@ export function installFakeAssessmentApi(options: Options = {}) {
     /** When set, PUTs wait for this promise before completing (to observe progress). */
     holdPuts: null as Promise<void> | null,
     s3Objects: new Set<string>(),
+    /** Result of the confirmation email in a successful submission. */
+    confirmationEmailSent: true,
+    /** Forces POST /assessment/submit to fail with this HTTP status (0 = network error). */
+    submitFailure: null as null | { status: number; code: string; message: string; details?: unknown },
+    submitDelayMs: 0,
     deletedKeys: [] as string[],
     keyCounter: 0,
   };
@@ -66,6 +71,7 @@ export function installFakeAssessmentApi(options: Options = {}) {
   const uploadUrlRequests: Array<{ questionId: string; mimeType: string; sizeBytes: number }> = [];
   const puts: Array<{ url: string; headers: Record<string, string>; size: number }> = [];
   const confirms: Array<{ questionId: string; objectKey: string }> = [];
+  const submits: number[] = [];
 
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -110,10 +116,41 @@ export function installFakeAssessmentApi(options: Options = {}) {
     const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
 
     if (method === 'GET' && path === '/assessment') {
+      if (state.status === 'Completed') {
+        return json(409, { error: { code: 'ASSESSMENT_COMPLETED', message: 'Already submitted.' } });
+      }
       if (options.loadError) {
         return json(options.loadError.status, { error: { code: options.loadError.code, message: 'Error' } });
       }
       return json(200, assessmentBody());
+    }
+    if (method === 'POST' && path === '/assessment/submit') {
+      submits.push(Date.now());
+      if (state.submitDelayMs) await new Promise((r) => setTimeout(r, state.submitDelayMs));
+      if (state.submitFailure) {
+        if (state.submitFailure.status === 0) throw new TypeError('Failed to fetch');
+        const { status, ...error } = state.submitFailure;
+        return json(status, { error });
+      }
+      if (state.status === 'Completed') {
+        return json(409, { error: { code: 'ASSESSMENT_COMPLETED', message: 'This assessment has already been submitted.' } });
+      }
+      const missing = QUESTIONS.flatMap((q) => {
+        const writtenMissing = !(state.answers.get(q.id) ?? '').trim();
+        const videoMissing = !state.videoKeys.has(q.id);
+        return writtenMissing || videoMissing ? [{ questionNumber: q.questionNumber, writtenMissing, videoMissing }] : [];
+      });
+      if (missing.length) {
+        return json(400, {
+          error: { code: 'ASSESSMENT_INCOMPLETE', message: 'Your assessment is not complete yet.', details: { missing } },
+        });
+      }
+      state.status = 'Completed';
+      return json(200, {
+        assessment: { status: 'Completed', completedAt: '2026-11-20T10:30:00.000Z' },
+        message: 'Assessment submitted successfully.',
+        confirmationEmail: { sent: state.confirmationEmailSent },
+      });
     }
     if (method === 'POST' && path === '/assessment/start') {
       starts.push(Date.now());
@@ -209,5 +246,5 @@ export function installFakeAssessmentApi(options: Options = {}) {
 
   vi.stubGlobal('fetch', fetchMock);
   vi.stubGlobal('XMLHttpRequest', FakeXHR);
-  return { state, saves, starts, uploadUrlRequests, puts, confirms, fetchMock };
+  return { state, saves, starts, uploadUrlRequests, puts, confirms, submits, fetchMock };
 }

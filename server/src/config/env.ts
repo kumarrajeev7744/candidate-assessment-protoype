@@ -21,6 +21,8 @@ export interface AppConfig {
   /** IANA time zone used to format dates in emails (e.g. Asia/Kolkata). */
   emailTimeZone: string;
   video: VideoStorageConfig;
+  /** Optional employer name shown in candidate emails (COMPANY_NAME). Never invented. */
+  companyName: string | undefined;
 }
 
 export interface VideoStorageConfig {
@@ -126,6 +128,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       maxBytes: (parseNonNegativeInt(env.VIDEO_MAX_MB, 200, 'VIDEO_MAX_MB') || 200) * 1024 * 1024,
       urlExpiresInSeconds: parseDurationSeconds(env.VIDEO_URL_EXPIRES_IN, 900, 'VIDEO_URL_EXPIRES_IN'),
     },
+    companyName: env.COMPANY_NAME?.trim() || undefined,
   };
 }
 

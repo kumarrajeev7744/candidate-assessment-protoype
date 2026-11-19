@@ -42,3 +42,15 @@ export interface StartAssessmentResult {
   candidate: CandidateInfo;
   assessment: AssessmentInfo;
 }
+
+export interface SubmitAssessmentResult {
+  assessment: { status: 'Completed'; completedAt: string };
+  message: string;
+  confirmationEmail: { sent: boolean };
+}
+
+export interface MissingResponse {
+  questionNumber: number;
+  writtenMissing: boolean;
+  videoMissing: boolean;
+}
