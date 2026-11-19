@@ -1,9 +1,14 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { BrandMark, Icon } from './ui/Icon';
 
 export function Layout() {
   const { status, admin, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const signedIn = status === 'authenticated';
+  // Candidate reports belong to the Candidates section too.
+  const candidatesActive = pathname.startsWith('/admin/dashboard') || pathname.startsWith('/admin/candidates');
 
   function handleLogout() {
     logout();
@@ -13,17 +18,35 @@ export function Layout() {
   return (
     <div className="app">
       <header className="app-header">
-        <Link to="/" className="app-brand">
-          Candidate Assessment Platform
-        </Link>
-        {status === 'authenticated' && (
-          <div className="app-user">
-            <span>{admin?.email}</span>
-            <button type="button" className="button-link" onClick={handleLogout}>
-              Log out
-            </button>
-          </div>
-        )}
+        <div className="app-header-inner">
+          <Link to={signedIn ? '/admin/dashboard' : '/'} className="app-brand">
+            <BrandMark />
+            <span className="brand-name">Candidate Assessment Platform</span>
+          </Link>
+          {signedIn && (
+            <>
+              <nav className="app-nav" aria-label="Recruiter">
+                <Link
+                  to="/admin/dashboard"
+                  className={candidatesActive ? 'app-nav-link active' : 'app-nav-link'}
+                  aria-current={candidatesActive ? 'page' : undefined}
+                >
+                  Candidates
+                </Link>
+              </nav>
+              <div className="app-user">
+                <span className="avatar" aria-hidden="true">
+                  {admin?.email.charAt(0).toUpperCase()}
+                </span>
+                <span className="app-user-email">{admin?.email}</span>
+                <button type="button" className="button-secondary button-small" onClick={handleLogout}>
+                  <Icon name="logout" size={16} />
+                  Log out
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </header>
       <main className="app-main">
         <Outlet />

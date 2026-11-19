@@ -1,0 +1,55 @@
+/* ---------- App shell ---------- */
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+.app-header {
+  position: sticky; top: 0; z-index: 20;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(160%) blur(8px);
+  border-bottom: 1px solid var(--color-border);
+}
+.app-header-inner {
+  max-width: var(--container-wide);
+  margin: 0 auto;
+  min-height: var(--header-height);
+  padding: var(--space-2) var(--space-6);
+  display: flex; align-items: center; gap: var(--space-6);
+}
+.app-brand {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  color: var(--ink-700); text-decoration: none;
+  font-weight: var(--weight-bold); font-size: var(--text-lg); letter-spacing: -0.01em;
+}
+.app-brand:hover { color: var(--ink-800); }
+.app-nav { display: flex; gap: var(--space-1); }
+.app-nav-link {
+  color: var(--gray-600); text-decoration: none; font-weight: var(--weight-medium); font-size: var(--text-md);
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-pill);
+}
+.app-nav-link:hover { color: var(--ink-700); background: var(--violet-50); }
+.app-nav-link.active { color: var(--violet-700); background: var(--violet-100); }
+.app-user { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.app-user-email { font-size: var(--text-md); color: var(--gray-600); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: var(--container-default);
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6) var(--space-12);
+}
+.app-main:has(.dashboard),
+.app-main:has(.auth-layout) { max-width: var(--container-wide); }
+.app-main:has(.candidate-page) { max-width: var(--container-narrow); }
+
+@media (max-width: 1024px) {
+  .app-user-email { display: none; }
+}
+@media (max-width: 760px) {
+  .app-header-inner { padding: var(--space-2) var(--space-4); gap: var(--space-3); }
+  .brand-name { font-size: var(--text-md); }
+  /* Signed-in recruiters: mark only, so brand, nav and account fit on one row. */
+  .app-header-inner:has(.app-user) .brand-name { display: none; }
+  .app-user-email { display: none; }
+  .app-user .avatar { display: none; }
+  .app-main { padding: var(--space-5) var(--space-4) var(--space-10); }
+  .page, .card { padding: var(--space-5); border-radius: var(--radius-lg); }
+}

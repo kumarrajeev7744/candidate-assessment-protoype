@@ -5,6 +5,7 @@ import { ProgressIndicator } from '../../components/assessment/ProgressIndicator
 import { SaveIndicator } from '../../components/assessment/SaveIndicator';
 import { VideoAnswerSection } from '../../components/assessment/VideoAnswerSection';
 import { storePosition } from '../../utils/assessmentPosition';
+import { Icon } from '../../components/ui/Icon';
 
 export function QuestionPage() {
   const {
@@ -15,6 +16,7 @@ export function QuestionPage() {
     saveError,
     completedCount,
     firstIncompleteNumber,
+    isQuestionComplete,
     updateDraft,
     saveNow,
   } = useAssessment();
@@ -90,10 +92,22 @@ export function QuestionPage() {
         </p>
         <ProgressIndicator completed={completedCount} total={total} />
       </div>
+      <ol className="step-dots" aria-hidden="true">
+        {data.questions.map((q) => (
+          <li
+            key={q.id}
+            className={[
+              'step-dot',
+              q.questionNumber === number ? 'is-current' : '',
+              isQuestionComplete(q) ? 'is-complete' : '',
+            ].join(' ')}
+          />
+        ))}
+      </ol>
 
       <h1 className="question-text">{question.questionText}</h1>
 
-      <div className="field">
+      <div className="field answer-field">
         <label htmlFor={textareaId}>Your written answer</label>
         <textarea
           id={textareaId}
@@ -134,10 +148,12 @@ export function QuestionPage() {
           onClick={() => void goPrevious()}
           disabled={number === 1 || navigating || videoBusy}
         >
+          <Icon name="arrowLeft" size={16} />
           Previous
         </button>
         <button type="button" className="button-primary" onClick={() => void goNext()} disabled={navigating || videoBusy}>
           {isLast ? 'Review answers' : 'Next'}
+          <Icon name="arrowRight" size={16} />
         </button>
       </div>
     </section>

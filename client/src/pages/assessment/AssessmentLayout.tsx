@@ -8,14 +8,17 @@ function AssessmentGate() {
   if (load.kind === 'loading') {
     return (
       <section className="page candidate-page">
-        <p role="status">Loading your assessment…</p>
+        <p role="status" className="loading-state">
+          <span className="spinner" aria-hidden="true" />
+          Loading your assessment…
+        </p>
       </section>
     );
   }
   if (load.kind === 'fatal') return <AssessmentStatusMessage reason={load.reason} />;
   if (load.kind === 'error') {
     return (
-      <section className="page candidate-page">
+      <section className="page candidate-page state-page">
         <h1>Something went wrong</h1>
         <p className="form-error" role="alert">
           {load.message}

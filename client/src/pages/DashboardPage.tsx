@@ -7,6 +7,7 @@ import { formatShortDateTime } from '../utils/format';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { CreateCandidateDialog } from '../components/dashboard/CreateCandidateDialog';
 import { StatusBadge } from '../components/dashboard/StatusBadge';
+import { Icon } from '../components/ui/Icon';
 
 /** Tunable for tests. */
 export const dashboardSettings = { searchDebounceMs: 300, pageSize: 50 };
@@ -144,29 +145,46 @@ export function DashboardPage() {
   const firstLoad = loading && !data;
 
   return (
-    <section className="page dashboard">
-      <div className="dashboard-header">
-        <h1>Candidates</h1>
+    <section className="page page-plain dashboard">
+      <div className="page-header dashboard-header">
+        <div>
+          <span className="eyebrow">Recruiter dashboard</span>
+          <h1>Candidates</h1>
+          <p className="page-subtitle">Invite candidates, follow their progress and open their reports.</p>
+        </div>
         <div className="dashboard-actions">
           <button type="button" className="button-secondary" onClick={refresh} disabled={loading}>
+            <Icon name="refresh" size={16} />
             {loading && data ? 'Refreshing…' : 'Refresh'}
           </button>
           <button type="button" className="button-primary" onClick={() => setCreating(true)}>
+            <Icon name="plus" size={16} />
             Create Candidate
           </button>
         </div>
       </div>
 
-      <div className="field search-field">
-        <label htmlFor="candidate-search">Search by name or email</label>
-        <input
-          id="candidate-search"
-          type="search"
-          value={searchInput}
-          maxLength={100}
-          placeholder="e.g. Priya or priya@example.com"
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
+      <div className="toolbar card">
+        <div className="field search-field">
+          <label htmlFor="candidate-search">Search by name or email</label>
+          <div className="input-with-icon">
+            <Icon name="search" />
+            <input
+              id="candidate-search"
+              type="search"
+              value={searchInput}
+              maxLength={100}
+              placeholder="e.g. Priya or priya@example.com"
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
+        </div>
+        {pagination && (
+          <p className="toolbar-count">
+            <strong>{pagination.total}</strong> {pagination.total === 1 ? 'candidate' : 'candidates'}
+            {data?.search ? ' found' : ''}
+          </p>
+        )}
       </div>
 
       {feedback && (
@@ -181,7 +199,12 @@ export function DashboardPage() {
         </div>
       )}
 
-      {firstLoad && <p role="status">Loading candidates…</p>}
+      {firstLoad && (
+        <p role="status" className="loading-state">
+          <span className="spinner" aria-hidden="true" />
+          Loading candidates…
+        </p>
+      )}
 
       {loadError && (
         <div className="form-error" role="alert">
@@ -194,11 +217,14 @@ export function DashboardPage() {
 
       {data && !loadError && items.length === 0 && (
         <div className="empty-state">
+          <span className="status-icon status-icon-brand">
+            <Icon name={data.search ? 'search' : 'user'} size={24} />
+          </span>
           {data.search ? (
-            <p>No candidates match “{data.search}”.</p>
+            <p className="empty-title">No candidates match “{data.search}”.</p>
           ) : (
             <>
-              <p>No candidates yet.</p>
+              <p className="empty-title">No candidates yet.</p>
               <p className="field-hint">Use “Create Candidate” to invite your first candidate.</p>
             </>
           )}

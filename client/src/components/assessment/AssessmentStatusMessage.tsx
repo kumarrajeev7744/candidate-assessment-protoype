@@ -1,4 +1,12 @@
 import type { FatalKind } from '../../context/AssessmentContext';
+import { Icon, type IconName } from '../ui/Icon';
+
+const ICON: Record<FatalKind, { name: IconName; tone: string }> = {
+  invalid: { name: 'link', tone: 'status-icon-danger' },
+  expired: { name: 'clock', tone: 'status-icon-warning' },
+  completed: { name: 'checkCircle', tone: 'status-icon-success' },
+  unavailable: { name: 'alert', tone: 'status-icon-warning' },
+};
 
 const CONTENT: Record<FatalKind, { title: string; body: string }> = {
   invalid: {
@@ -22,7 +30,10 @@ const CONTENT: Record<FatalKind, { title: string; body: string }> = {
 export function AssessmentStatusMessage({ reason }: { reason: FatalKind }) {
   const { title, body } = CONTENT[reason];
   return (
-    <section className="page candidate-page">
+    <section className="page candidate-page state-page">
+      <span className={`status-icon ${ICON[reason].tone}`}>
+        <Icon name={ICON[reason].name} size={28} />
+      </span>
       <h1>{title}</h1>
       <p>{body}</p>
     </section>

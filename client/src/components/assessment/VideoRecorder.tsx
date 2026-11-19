@@ -10,6 +10,7 @@ import {
   pickRecorderMimeType,
   stopStream,
 } from '../../utils/media';
+import { Icon } from '../ui/Icon';
 
 type RecorderPhase = 'idle' | 'requesting' | 'live' | 'recording' | 'preview' | 'error';
 
@@ -193,16 +194,33 @@ export function VideoRecorder({ maxSeconds, onAccept, onActiveChange, startLabel
   return (
     <div className="video-recorder">
       {phase === 'idle' && (
-        <button type="button" className="button-primary" onClick={() => void openCamera()}>
-          {startLabel}
-        </button>
+        <div className="recorder-idle">
+          <span className="status-icon status-icon-brand" aria-hidden="true">
+            <Icon name="video" size={24} />
+          </span>
+          <button type="button" className="button-primary" onClick={() => void openCamera()}>
+            {startLabel}
+          </button>
+        </div>
       )}
 
-      {phase === 'requesting' && <p role="status">Waiting for camera and microphone permission…</p>}
+      {phase === 'requesting' && (
+        <p role="status" className="loading-state">
+          <span className="spinner" aria-hidden="true" />
+          Waiting for camera and microphone permission…
+        </p>
+      )}
 
       {(phase === 'live' || phase === 'recording') && (
         <>
-          <video ref={liveVideoRef} className="video-frame" autoPlay muted playsInline aria-label="Camera preview" />
+          <div className={phase === 'recording' ? 'video-stage is-recording' : 'video-stage'}>
+            <video ref={liveVideoRef} className="video-frame" autoPlay muted playsInline aria-label="Camera preview" />
+            {phase === 'recording' && (
+              <span className="recording-indicator" role="timer" aria-live="off">
+                Recording {formatDuration(elapsed)} / {formatDuration(maxSeconds)}
+              </span>
+            )}
+          </div>
           {phase === 'live' ? (
             <div className="video-controls">
               <button type="button" className="button-primary" onClick={startRecording}>
@@ -215,10 +233,7 @@ export function VideoRecorder({ maxSeconds, onAccept, onActiveChange, startLabel
             </div>
           ) : (
             <div className="video-controls">
-              <span className="recording-indicator" role="timer" aria-live="off">
-                ● Recording {formatDuration(elapsed)} / {formatDuration(maxSeconds)}
-              </span>
-              <button type="button" className="button-primary" onClick={stopRecording}>
+              <button type="button" className="button-danger" onClick={stopRecording}>
                 Stop recording
               </button>
               {remaining <= 10 && <span className="field-error">Recording stops in {remaining}s</span>}

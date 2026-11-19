@@ -6,6 +6,7 @@ import type { AcceptedRecording } from '../../types/video';
 import { formatDuration } from '../../utils/media';
 import { VideoPlayer } from './VideoPlayer';
 import { VideoRecorder } from './VideoRecorder';
+import { Icon } from '../ui/Icon';
 
 interface Props {
   question: AssessmentQuestion;
@@ -61,8 +62,10 @@ export function VideoAnswerSection({ question, onBusyChange }: Props) {
   return (
     <section className="video-section" aria-labelledby={`video-heading-${question.id}`}>
       <div className="video-section-header">
-        <h2 id={`video-heading-${question.id}`}>Your video answer</h2>
-        <span className={uploaded ? 'badge badge-success' : 'badge'} data-testid="video-status">
+        <h2 id={`video-heading-${question.id}`}>
+          <Icon name="video" size={18} /> Your video answer
+        </h2>
+        <span className={uploaded ? 'badge badge-success' : 'badge badge-neutral'} data-testid="video-status">
           {uploaded ? 'Video uploaded' : 'No video yet'}
         </span>
       </div>

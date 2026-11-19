@@ -73,6 +73,7 @@ export function CreateCandidateDialog({ onCreated, onClose }: Props) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={200}
+              placeholder="e.g. Priya Sharma"
               autoComplete="off"
               aria-invalid={Boolean(errors.name)}
               aria-describedby={errors.name ? `${titleId}-name-error` : undefined}
@@ -92,6 +93,7 @@ export function CreateCandidateDialog({ onCreated, onClose }: Props) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               maxLength={254}
+              placeholder="candidate@example.com"
               autoComplete="off"
               aria-invalid={Boolean(errors.email)}
               aria-describedby={errors.email ? `${titleId}-email-error` : undefined}
