@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { AppError } from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
+import { RequestValidationError } from './validateBody.js';
 
 interface ErrorBody {
   error: { code: string; message: string; details?: Record<string, string> };
@@ -17,6 +18,12 @@ function isDuplicateKeyError(err: unknown): err is { code: 11000; keyValue?: Rec
 
 /** Converts known errors into a status code + client-safe body. */
 export function toErrorResponse(err: unknown): { status: number; body: ErrorBody } {
+  if (err instanceof RequestValidationError) {
+    return {
+      status: 400,
+      body: { error: { code: err.code, message: err.message, details: err.details } },
+    };
+  }
   if (err instanceof AppError) {
     return { status: err.statusCode, body: { error: { code: err.code, message: err.message } } };
   }

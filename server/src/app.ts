@@ -1,18 +1,32 @@
 import express, { type Express } from 'express';
 import cors from 'cors';
 import { config } from './config/env.js';
-import { apiRouter } from './routes/index.js';
+import { createApiRouter } from './routes/index.js';
 import { notFound } from './middleware/notFound.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import type { RateLimitOptions } from './middleware/rateLimiters.js';
 
-export function createApp(): Express {
+export interface AppOptions {
+  loginRateLimit?: RateLimitOptions;
+}
+
+export function createApp(options: AppOptions = {}): Express {
   const app = express();
 
   app.disable('x-powered-by');
-  app.use(cors({ origin: config.clientUrls }));
+  if (config.trustProxy > 0) app.set('trust proxy', config.trustProxy);
+
+  app.use(
+    cors({
+      origin: config.clientUrls,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      maxAge: 600,
+    }),
+  );
   app.use(express.json({ limit: '100kb' }));
 
-  app.use('/api', apiRouter);
+  app.use('/api', createApiRouter({ loginRateLimit: options.loginRateLimit ?? config.loginRateLimit }));
 
   app.use(notFound);
   app.use(errorHandler);

@@ -1,16 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import { App } from '../src/App';
-import { AppRoutes } from '../src/routes/AppRoutes';
-
-function renderAt(path: string) {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <AppRoutes />
-    </MemoryRouter>,
-  );
-}
+import { renderApp } from './helpers/renderApp';
 
 describe('App', () => {
   it('renders the application shell', () => {
@@ -20,19 +11,20 @@ describe('App', () => {
   });
 
   it('displays the landing page at /', () => {
-    renderAt('/');
+    renderApp('/');
     expect(
       screen.getByRole('heading', { level: 1, name: 'Candidate Assessment Platform' }),
     ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Recruiter login' })).toHaveAttribute('href', '/admin/login');
   });
 
   it('displays the not-found page for unknown routes', () => {
-    renderAt('/some/unknown/route');
+    renderApp('/some/unknown/route');
     expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
   });
 
   it('navigates from the not-found page back to the landing page', async () => {
-    renderAt('/missing');
+    renderApp('/missing');
     await userEvent.click(screen.getByRole('link', { name: 'Go to home page' }));
     expect(
       screen.getByRole('heading', { level: 1, name: 'Candidate Assessment Platform' }),

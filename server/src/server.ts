@@ -3,11 +3,13 @@ import { createApp } from './app.js';
 import { config } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './config/database.js';
 import { logger } from './utils/logger.js';
+import { getJwtSecret } from './utils/jwt.js';
 
 let server: Server | undefined;
 let shuttingDown = false;
 
 async function start(): Promise<void> {
+  getJwtSecret(); // fail fast if JWT_SECRET is missing or weak
   await connectDatabase(config.mongodbUri);
   const app = createApp();
   server = app.listen(config.port, () => {

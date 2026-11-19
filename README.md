@@ -32,6 +32,19 @@ cp server/.env.example server/.env
 | server | `NODE_ENV` | `development`, `test` or `production` | `development` |
 | server | `CLIENT_URL` | Allowed CORS origin(s), comma-separated | `http://localhost:5173` |
 | server | `MONGODB_URI` | MongoDB Atlas connection string (**required** to start the API) | – |
+| server | `JWT_SECRET` | Random secret, ≥ 32 characters (**required** to start the API) | – |
+| server | `JWT_EXPIRES_IN` | Admin token lifetime (`3600`, `30m`, `1h`, …) | `1h` |
+| server | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Admin account created by `seed:admin` (password ≥ 12 chars) | – |
+| server | `LOGIN_RATE_LIMIT_MAX` | Failed logins allowed per IP per 15 minutes | `10` |
+| server | `TRUST_PROXY` | Proxy hops to trust for client IPs (`1` on App Runner) | `0` |
+
+Secrets are only ever server-side; nothing secret goes into `VITE_*` variables (those are bundled into the public frontend).
+
+Generate a JWT secret:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
 
 ## MongoDB Atlas setup
 
@@ -56,6 +69,27 @@ npm run seed:questions:prod --workspace server   # after build (compiled JS)
 ```
 
 The seed is idempotent: it upserts by question number, updates text in place, re-activates questions, and never deletes or duplicates records.
+
+## Admin account and authentication
+
+There is a single seeded admin account (no registration). Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `server/.env`, then:
+
+```bash
+npm run seed:admin --workspace server        # development
+npm run seed:admin:prod --workspace server   # after build
+```
+
+The seed is idempotent: if the admin already exists it is left unchanged (the password is **not** overwritten). The password and hash are never logged. You can remove `ADMIN_PASSWORD` from `.env` after seeding.
+
+Log in at `http://localhost:5173/admin/login`.
+
+| Endpoint | Auth | Description |
+|---|---|---|
+| `POST /api/auth/login` | – | `{ email, password }` → `{ token, expiresAt, admin }`. 400 invalid body, 401 bad credentials, 429 rate limited |
+| `GET /api/auth/me` | Bearer JWT | `{ admin: { id, email, createdAt } }` |
+| `POST /api/auth/logout` | – | `{ message }`; the client discards its token |
+
+Recruiter APIs are protected with the reusable `requireAuth` middleware (`Authorization: Bearer <token>`).
 
 ## Data model
 
