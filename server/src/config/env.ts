@@ -15,6 +15,20 @@ export interface AppConfig {
   /** Number of proxy hops to trust for client IPs (App Runner sits behind a load balancer). */
   trustProxy: number;
   loginRateLimit: { windowMs: number; max: number };
+  /** Public frontend URL used to build links in emails (first CLIENT_URL entry). */
+  appBaseUrl: string;
+  smtp: SmtpConfig;
+  /** IANA time zone used to format dates in emails (e.g. Asia/Kolkata). */
+  emailTimeZone: string;
+}
+
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string | undefined;
+  pass: string | undefined;
+  from: string | undefined;
 }
 
 const DURATION_UNITS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
@@ -49,14 +63,29 @@ function parseNonNegativeInt(value: string | undefined, fallback: number, name: 
   return n;
 }
 
+function parseTimeZone(value: string | undefined): string {
+  const tz = value?.trim() || 'UTC';
+  try {
+    new Intl.DateTimeFormat('en-GB', { timeZone: tz });
+  } catch {
+    throw new Error(`Invalid EMAIL_TIMEZONE value: ${value}`);
+  }
+  return tz;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+  const clientUrls = (env.CLIENT_URL ?? 'http://localhost:5173')
+    .split(',')
+    .map((url) => url.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+  const smtpPort = env.SMTP_PORT?.trim() ? Number(env.SMTP_PORT) : 587;
+  if (!Number.isInteger(smtpPort) || smtpPort <= 0 || smtpPort > 65535) {
+    throw new Error(`Invalid SMTP_PORT value: ${env.SMTP_PORT}`);
+  }
   return {
     port: parsePort(env.PORT),
     nodeEnv: parseNodeEnv(env.NODE_ENV),
-    clientUrls: (env.CLIENT_URL ?? 'http://localhost:5173')
-      .split(',')
-      .map((url) => url.trim())
-      .filter(Boolean),
+    clientUrls,
     mongodbUri: env.MONGODB_URI?.trim() || undefined,
     jwtSecret: env.JWT_SECRET || undefined,
     jwtExpiresInSeconds: parseDurationSeconds(env.JWT_EXPIRES_IN, 3600, 'JWT_EXPIRES_IN'),
@@ -65,6 +94,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       windowMs: 15 * 60 * 1000,
       max: parseNonNegativeInt(env.LOGIN_RATE_LIMIT_MAX, 10, 'LOGIN_RATE_LIMIT_MAX') || 10,
     },
+    appBaseUrl: clientUrls[0] ?? 'http://localhost:5173',
+    smtp: {
+      host: env.SMTP_HOST?.trim() || 'smtp.gmail.com',
+      port: smtpPort,
+      // Port 587 uses STARTTLS (secure=false); set SMTP_SECURE=true only for port 465.
+      secure: env.SMTP_SECURE?.trim().toLowerCase() === 'true',
+      user: env.SMTP_USER?.trim() || undefined,
+      // Gmail shows App Passwords with spaces ("abcd efgh ijkl mnop"); spaces are not part of it.
+      pass: env.SMTP_PASS?.replace(/\s+/g, '') || undefined,
+      from: env.SMTP_FROM?.trim() || undefined,
+    },
+    emailTimeZone: parseTimeZone(env.EMAIL_TIMEZONE),
   };
 }
 

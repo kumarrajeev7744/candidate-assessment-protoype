@@ -96,3 +96,4 @@ a { color: var(--color-primary); }
   cursor: pointer;
 }
 .button-primary:disabled { opacity: 0.65; cursor: progress; }
+.candidate-page { max-width: 640px; margin: 0 auto; }

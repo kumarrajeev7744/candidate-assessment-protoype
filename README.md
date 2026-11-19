@@ -37,6 +37,12 @@ cp server/.env.example server/.env
 | server | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Admin account created by `seed:admin` (password ≥ 12 chars) | – |
 | server | `LOGIN_RATE_LIMIT_MAX` | Failed logins allowed per IP per 15 minutes | `10` |
 | server | `TRUST_PROXY` | Proxy hops to trust for client IPs (`1` on App Runner) | `0` |
+| server | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | SMTP server | `smtp.gmail.com` / `587` / `false` |
+| server | `SMTP_USER` / `SMTP_PASS` | Gmail address and Google App Password | – (email disabled) |
+| server | `SMTP_FROM` | Sender shown to recipients | `"Candidate Assessment" <SMTP_USER>` |
+| server | `EMAIL_TIMEZONE` | IANA time zone for dates in emails (e.g. `Asia/Kolkata`) | `UTC` |
+
+`CLIENT_URL` (first entry) is also used to build links in emails, e.g. `{CLIENT_URL}/assessment/{token}`.
 
 Secrets are only ever server-side; nothing secret goes into `VITE_*` variables (those are bundled into the public frontend).
 
@@ -90,6 +96,29 @@ Log in at `http://localhost:5173/admin/login`.
 | `POST /api/auth/logout` | – | `{ message }`; the client discards its token |
 
 Recruiter APIs are protected with the reusable `requireAuth` middleware (`Authorization: Bearer <token>`).
+
+## Email (Gmail SMTP)
+
+1. The Gmail account needs 2-Step Verification and a Google **App Password** (Google Account → Security → App passwords). Reuse an existing one if you have it.
+2. In `server/.env` set `SMTP_USER` (the Gmail address), `SMTP_PASS` (the 16-character App Password; spaces are ignored) and optionally `SMTP_FROM`.
+3. Verify the settings (and optionally send a test message):
+
+```bash
+npm run email:verify --workspace server
+npm run email:verify --workspace server -- you@example.com
+```
+
+The API starts without SMTP credentials; email operations then report `Email service is not configured`. Credentials, tokens and links are never logged. Automated tests use a fake transport and never send real email.
+
+## Candidate invitations
+
+| Endpoint | Auth | Description |
+|---|---|---|
+| `POST /api/invitations` | Bearer JWT | `{ name, email }` → 201 `{ candidate, invitation, email: { sent, error? } }`. 400 invalid input, 409 duplicate email. Email failures keep the records with `emailStatus: "Failed"` |
+| `POST /api/invitations/:id/resend` | Bearer JWT | New token + email; old link stops working; expiry reset to 7 days. 400 bad ID, 404 not found, 409 already completed, 503 email not configured |
+| `GET /api/invitations/validate/:token` | Public | 200 `{ valid, status, expiresAt }`, 404 invalid, 410 expired, 409 completed. Read-only (never changes status) |
+
+Candidates open `{CLIENT_URL}/assessment/{token}`, which currently shows whether the invitation is valid, expired or already completed.
 
 ## Data model
 
