@@ -4,6 +4,8 @@ import {
   baseMimeType,
   describeMediaError,
   formatDuration,
+  getDeviceAvailability,
+  mediaErrorDetail,
   isRecordingSupported,
   pickRecorderMimeType,
   stopStream,
@@ -28,6 +30,7 @@ interface Props {
 export function VideoRecorder({ maxSeconds, onAccept, onActiveChange, startLabel = 'Record video' }: Props) {
   const [phase, setPhase] = useState<RecorderPhase>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -86,6 +89,7 @@ export function VideoRecorder({ maxSeconds, onAccept, onActiveChange, startLabel
 
   const openCamera = useCallback(async () => {
     setError(null);
+    setErrorDetail(null);
     revokePreview();
     recordingRef.current = null;
     if (!isRecordingSupported()) {
@@ -95,15 +99,26 @@ export function VideoRecorder({ maxSeconds, onAccept, onActiveChange, startLabel
     }
     setPhase('requesting');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-        audio: { echoCancellation: true, noiseSuppression: true },
-      });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+          audio: { echoCancellation: true, noiseSuppression: true },
+        });
+      } catch (err) {
+        // Some devices reject the preferred settings: fall back to the browser defaults once.
+        const name = (err as { name?: string } | null)?.name;
+        if (name !== 'OverconstrainedError' && name !== 'NotFoundError') throw err;
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      }
       streamRef.current = stream;
       setPhase('live');
     } catch (err) {
       releaseCamera();
-      setError(describeMediaError(err));
+      const devices = await getDeviceAvailability();
+      console.warn('Camera/microphone access failed:', mediaErrorDetail(err), devices);
+      setError(describeMediaError(err, devices));
+      setErrorDetail(mediaErrorDetail(err));
       setPhase('error');
     }
   }, [releaseCamera, revokePreview]);
@@ -232,6 +247,7 @@ export function VideoRecorder({ maxSeconds, onAccept, onActiveChange, startLabel
           <p className="form-error" role="alert">
             {error}
           </p>
+          {errorDetail && <p className="field-hint">Technical details: {errorDetail}</p>}
           <button type="button" className="button-secondary" onClick={() => void openCamera()}>
             Try again
           </button>

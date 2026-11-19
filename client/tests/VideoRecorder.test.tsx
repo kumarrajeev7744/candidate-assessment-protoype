@@ -31,15 +31,28 @@ describe('VideoRecorder', () => {
   });
 
   it.each([
-    ['NotAllowedError', /access was blocked/],
-    ['NotFoundError', /No camera or microphone was found/],
-    ['NotReadableError', /being used by another application/],
-  ])('shows a clear message for %s', async (name, message) => {
-    installFakeMedia({ deny: name });
+    ['NotAllowedError', undefined, /access was blocked/],
+    ['NotFoundError', [], /No camera or microphone was found/],
+    ['NotFoundError', ['audioinput'], /^No camera was found/],
+    ['NotFoundError', ['videoinput'], /^No microphone was found/],
+    ['NotFoundError', ['videoinput', 'audioinput'], /Privacy & Security/],
+    ['NotReadableError', undefined, /being used by another application/],
+  ] as const)('shows a clear message for %s with devices %j', async (name, devices, message) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    installFakeMedia({ deny: name, devices: devices ? [...devices] : undefined });
     renderRecorder();
     await userEvent.click(screen.getByRole('button', { name: 'Record video' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(screen.getByText(`Technical details: ${name}: ${name}`)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
+  it('falls back to default camera settings when the preferred ones are not available', async () => {
+    const media = installFakeMedia();
+    media.getUserMedia.mockRejectedValueOnce(Object.assign(new Error('x'), { name: 'OverconstrainedError' }));
+    renderRecorder();
+    await openCamera();
+    expect(media.getUserMedia).toHaveBeenLastCalledWith({ video: true, audio: true });
   });
 
   it('explains when the browser cannot record video', async () => {

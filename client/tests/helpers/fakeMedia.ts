@@ -35,7 +35,9 @@ export class FakeMediaRecorder {
 }
 
 /** Installs fake getUserMedia + MediaRecorder. `deny` makes getUserMedia reject with that DOMException name. */
-export function installFakeMedia(options: { deny?: string; noMediaRecorder?: boolean } = {}) {
+export function installFakeMedia(
+  options: { deny?: string; noMediaRecorder?: boolean; devices?: Array<'videoinput' | 'audioinput'> } = {},
+) {
   const streams: Array<{ tracks: FakeTrack[] }> = [];
   FakeMediaRecorder.instances = [];
   FakeMediaRecorder.supportedTypes = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
@@ -53,7 +55,10 @@ export function installFakeMedia(options: { deny?: string; noMediaRecorder?: boo
     return { getTracks: () => tracks } as unknown as MediaStream;
   });
 
-  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } });
+  const enumerateDevices = vi.fn(async () =>
+    (options.devices ?? ['videoinput', 'audioinput']).map((kind, i) => ({ kind, deviceId: String(i), label: '' })),
+  );
+  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia, enumerateDevices } });
   if (options.noMediaRecorder) vi.stubGlobal('MediaRecorder', undefined);
   else vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
 
