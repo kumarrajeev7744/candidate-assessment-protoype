@@ -118,7 +118,25 @@ The API starts without SMTP credentials; email operations then report `Email ser
 | `POST /api/invitations/:id/resend` | Bearer JWT | New token + email; old link stops working; expiry reset to 7 days. 400 bad ID, 404 not found, 409 already completed, 503 email not configured |
 | `GET /api/invitations/validate/:token` | Public | 200 `{ valid, status, expiresAt }`, 404 invalid, 410 expired, 409 completed. Read-only (never changes status) |
 
-Candidates open `{CLIENT_URL}/assessment/{token}`, which currently shows whether the invitation is valid, expired or already completed.
+Candidates open `{CLIENT_URL}/assessment/{token}`.
+
+## Candidate assessment
+
+Candidate APIs are authenticated with the invitation token in the `X-Assessment-Token` header (`requireCandidate` middleware, separate from recruiter JWTs). The candidate's identity always comes from the token.
+
+| Endpoint | Description |
+|---|---|
+| `POST /api/assessment/start` | Explicit Start: Invited → In Progress (resumes if already In Progress). 409 completed, 410 expired |
+| `GET /api/assessment` | Candidate name/email, status, the 10 active questions in order with the candidate's own saved responses, and progress. Read-only |
+| `PUT /api/assessment/questions/:questionId/response` | `{ writtenAnswer }` (≤ 1,000 chars). Upserts the single response for candidate + question. Only while In Progress |
+
+Errors: 401 missing/invalid token, 409 not started or already completed, 410 expired, 400 invalid question ID or answer, 404 unknown question.
+
+Frontend routes:
+
+- `/assessment/:token` – start screen (or resume where the candidate left off)
+- `/assessment/:token/questions/:number` – one question at a time with autosave (1 s debounce, saved before navigating, flushed when the tab is hidden/closed)
+- `/assessment/:token/review` – review of all written answers with Edit links
 
 ## Data model
 

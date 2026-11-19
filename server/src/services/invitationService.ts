@@ -10,14 +10,11 @@ import {
 } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 import { addDays, isExpired } from '../utils/dates.js';
-import { generateToken, hashToken } from '../utils/token.js';
+import { generateToken, hashToken, isWellFormedToken } from '../utils/token.js';
 import { logger } from '../utils/logger.js';
 import { EmailNotConfiguredError, isEmailConfigured, sendEmail } from './email/emailService.js';
 import { buildInvitationEmail } from './email/templates/invitationEmail.js';
 import type { CreateInvitationInput } from '../validation/invitationSchemas.js';
-
-/** Raw tokens are 32 random bytes in base64url: exactly 43 URL-safe characters. */
-const TOKEN_FORMAT = /^[A-Za-z0-9_-]{43}$/;
 
 export interface CandidateDto {
   id: string;
@@ -184,7 +181,7 @@ const invalidLink = () =>
  * (email security scanners may open links automatically).
  */
 export async function validateInvitationToken(rawToken: string): Promise<InvitationValidity> {
-  if (!TOKEN_FORMAT.test(rawToken)) throw invalidLink();
+  if (!isWellFormedToken(rawToken)) throw invalidLink();
   const invitation = await Invitation.findOne({ tokenHash: hashToken(rawToken) })
     .select('status expiresAt')
     .lean();

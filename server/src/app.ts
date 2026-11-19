@@ -20,7 +20,7 @@ export function createApp(options: AppOptions = {}): Express {
     cors({
       origin: config.clientUrls,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Assessment-Token'],
       maxAge: 600,
     }),
   );
