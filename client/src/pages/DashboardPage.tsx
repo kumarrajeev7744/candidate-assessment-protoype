@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../services/apiClient';
 import { listCandidates, resendConfirmationEmail, resendInvitation } from '../services/recruiterService';
 import type { CandidateListItem, CandidateListResponse, InvitationActionResult } from '../types/recruiter';
@@ -21,6 +21,7 @@ function errorText(err: unknown, fallback: string): string {
 }
 
 export function DashboardPage() {
+  const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -141,9 +142,18 @@ export function DashboardPage() {
     }
   }
 
-  /** Secondary row actions shown in the "⋯" menu (only those that apply to this candidate). */
+  /** Row actions shown in the "⋯" menu (only those that apply to this candidate). */
   function rowActions(item: CandidateListItem): MenuAction[] {
     const actions: MenuAction[] = [];
+    // Reports are only meaningful once the candidate has submitted.
+    if (item.status === 'Completed') {
+      actions.push({
+        label: 'View report',
+        ariaLabel: `Open report for ${item.candidate.name}`,
+        icon: 'eye',
+        onSelect: () => navigate(`/admin/candidates/${item.candidate.id}`),
+      });
+    }
     if (item.canResendInvitation) {
       actions.push({
         label: 'Resend invitation',
@@ -285,13 +295,6 @@ export function DashboardPage() {
                   </td>
                   <td data-label="Actions">
                     <div className="row-actions">
-                      <Link
-                        to={`/admin/candidates/${item.candidate.id}`}
-                        className="button-secondary button-small"
-                        aria-label={`Open report for ${item.candidate.name}`}
-                      >
-                        Report
-                      </Link>
                       <ActionsMenu
                         label={`More actions for ${item.candidate.name}`}
                         disabled={busyId === item.id}

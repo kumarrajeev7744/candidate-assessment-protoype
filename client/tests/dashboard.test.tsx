@@ -181,7 +181,7 @@ describe('Recruiter dashboard', () => {
     expect(listCalls(api)[0]!.auth).toBe('Bearer admin-jwt');
   });
 
-  it('shows Report for everyone and only the applicable actions in the "⋯" menu', async () => {
+  it('puts all row actions in the "⋯" menu, with only the applicable items', async () => {
     await openDashboard({
       rows: [
         ...ROWS,
@@ -189,22 +189,25 @@ describe('Recruiter dashboard', () => {
       ],
     });
     await screen.findByRole('table');
+    const menuItems = async (name: string) => {
+      await userEvent.click(within(rowFor(name)).getByRole('button', { name: `More actions for ${name}` }));
+      const labels = within(screen.getByRole('menu', { name: `More actions for ${name}` }))
+        .getAllByRole('menuitem')
+        .map((m) => m.textContent);
+      await userEvent.keyboard('{Escape}');
+      return labels;
+    };
 
-    await userEvent.click(within(rowFor('Neha Completed')).getByRole('button', { name: 'More actions for Neha Completed' }));
-    let menu = screen.getByRole('menu', { name: 'More actions for Neha Completed' });
-    expect(within(menu).getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Resend confirmation email']);
-    await userEvent.keyboard('{Escape}');
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(await menuItems('Neha Completed')).toEqual(['View report', 'Resend confirmation email']);
+    expect(await menuItems('Done Sent')).toEqual(['View report']);
+    expect(await menuItems('Arjun Progress')).toEqual(['Resend invitation']); // no report until completed
+    expect(await menuItems('Priya Expired')).toEqual(['Resend invitation']);
 
-    await userEvent.click(within(rowFor('Arjun Progress')).getByRole('button', { name: 'More actions for Arjun Progress' }));
-    menu = screen.getByRole('menu', { name: 'More actions for Arjun Progress' });
-    expect(within(menu).getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Resend invitation']);
-    await userEvent.keyboard('{Escape}');
-
-    // No applicable actions → no "⋯" button at all.
-    expect(within(rowFor('Done Sent')).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+    // No separate buttons or links outside the menu.
     for (const name of ['Neha Completed', 'Arjun Progress', 'Priya Expired', 'Done Sent']) {
-      expect(within(rowFor(name)).getByRole('link', { name: `Open report for ${name}` })).toBeInTheDocument();
+      const row = rowFor(name);
+      expect(within(row).queryByRole('link')).not.toBeInTheDocument();
+      expect(within(row).getAllByRole('button')).toHaveLength(1);
     }
   });
 
@@ -245,12 +248,12 @@ describe('Recruiter dashboard', () => {
     expect(await screen.findByRole('cell', { name: 'Late Arrival' })).toBeInTheDocument();
   });
 
-  it('navigates to the candidate report', async () => {
+  it('navigates to the candidate report from the menu', async () => {
     const api = await openDashboard({ rows: ROWS });
     await screen.findByRole('table');
-    await userEvent.click(screen.getByRole('link', { name: 'Open report for Arjun Progress' }));
+    await chooseAction('Neha Completed', 'Open report for Neha Completed');
     expect(await screen.findByRole('heading', { name: 'Candidate not found' })).toBeInTheDocument();
-    expect(api.calls.some((c) => c.path === '/candidates/cand-inv2/report')).toBe(true);
+    expect(api.calls.some((c) => c.path === '/candidates/cand-inv3/report')).toBe(true);
     await userEvent.click(screen.getByRole('link', { name: '← Back to candidates' }));
     expect(await screen.findByRole('heading', { name: 'Candidates' })).toBeInTheDocument();
   });
@@ -412,15 +415,19 @@ describe('Resend actions', () => {
     );
   });
 
-  it('resends a failed confirmation email and hides the action once sent', async () => {
+  it('resends a failed confirmation email and removes that action once sent', async () => {
     const api = await openDashboard({ rows: ROWS });
     await screen.findByRole('table');
     await chooseAction('Neha Completed', 'Resend confirmation email to Neha Completed');
     expect(await screen.findByText('Confirmation email sent to neha@example.com.')).toBeInTheDocument();
     expect(api.calls.some((c) => c.method === 'POST' && c.path === '/invitations/inv3/resend-confirmation')).toBe(true);
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'More actions for Neha Completed' })).not.toBeInTheDocument(),
-    );
+    // After the list refreshes, only "View report" remains for Neha.
+    await waitFor(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'More actions for Neha Completed' }));
+      const labels = within(screen.getByRole('menu')).getAllByRole('menuitem').map((m) => m.textContent);
+      await userEvent.keyboard('{Escape}');
+      expect(labels).toEqual(['View report']);
+    });
   });
 
   it('reports a confirmation email that failed again', async () => {

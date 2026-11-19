@@ -21,7 +21,8 @@ const MENU_WIDTH = 240;
 
 /**
  * "⋯" button that opens a small menu of row actions. Rendered with fixed positioning so it is never
- * clipped by a scrolling table. Keyboard: Enter/Space/ArrowDown open; arrows move; Escape closes.
+ * clipped by a scrolling table, and follows its button while the page scrolls.
+ * Keyboard: Enter/Space/ArrowDown open; arrows move; Escape closes.
  */
 export function ActionsMenu({ label, actions, disabled = false }: Props) {
   const menuId = useId();
@@ -35,15 +36,21 @@ export function ActionsMenu({ label, actions, disabled = false }: Props) {
     if (focusTrigger) triggerRef.current?.focus();
   }, []);
 
-  const openMenu = () => {
+  /** Places the menu under its button (or above it when there is no room below). */
+  const computePosition = useCallback(() => {
     const rect = triggerRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    if (!rect) return null;
     const itemHeight = 44;
     const height = actions.length * itemHeight + 12;
     const below = rect.bottom + 6;
     const top = below + height > window.innerHeight && rect.top - height - 6 > 0 ? rect.top - height - 6 : below;
     const left = Math.max(8, Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8));
-    setPosition({ top, left });
+    return { top, left, triggerVisible: rect.bottom > 0 && rect.top < window.innerHeight };
+  }, [actions.length]);
+
+  const openMenu = () => {
+    const next = computePosition();
+    if (next) setPosition({ top: next.top, left: next.left });
   };
 
   // Focus the first item when the menu opens.
@@ -58,10 +65,12 @@ export function ActionsMenu({ label, actions, disabled = false }: Props) {
       const target = e.target as Node;
       if (!triggerRef.current?.contains(target) && !document.getElementById(menuId)?.contains(target)) close();
     };
-    const onViewportChange = (e: Event) => {
-      // The menu is positioned for the current layout; close it if the page or table scrolls.
-      if (e.target instanceof Node && document.getElementById(menuId)?.contains(e.target)) return;
-      close();
+    // Keep the menu attached to its button while the page or table scrolls or resizes;
+    // close it only when the button leaves the screen.
+    const onViewportChange = () => {
+      const next = computePosition();
+      if (!next || !next.triggerVisible) close();
+      else setPosition((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : { top: next.top, left: next.left }));
     };
     document.addEventListener('mousedown', onPointer);
     window.addEventListener('resize', onViewportChange);
@@ -71,7 +80,7 @@ export function ActionsMenu({ label, actions, disabled = false }: Props) {
       window.removeEventListener('resize', onViewportChange);
       window.removeEventListener('scroll', onViewportChange, true);
     };
-  }, [open, close, menuId]);
+  }, [open, close, menuId, computePosition]);
 
   const onTriggerKey = (e: KeyboardEvent<HTMLButtonElement>) => {
     if (e.key === 'ArrowDown' && !open) {
