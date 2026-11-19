@@ -12,7 +12,39 @@ describe('loadConfig', () => {
       jwtExpiresInSeconds: 3600,
       trustProxy: 0,
       loginRateLimit: { windowMs: 15 * 60 * 1000, max: 10 },
+      appBaseUrl: 'http://localhost:5173',
+      smtp: {
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        user: undefined,
+        pass: undefined,
+        from: undefined,
+      },
+      emailTimeZone: 'UTC',
     });
+  });
+
+  it('parses SMTP settings and strips spaces from Gmail App Passwords', () => {
+    const cfg = loadConfig({
+      SMTP_USER: 'sender@gmail.com',
+      SMTP_PASS: 'abcd efgh ijkl mnop',
+      SMTP_FROM: 'Recruiting <sender@gmail.com>',
+      SMTP_PORT: '465',
+      SMTP_SECURE: 'true',
+      EMAIL_TIMEZONE: 'Asia/Kolkata',
+      CLIENT_URL: 'https://app.example.com/, http://localhost:5173',
+    });
+    expect(cfg.smtp).toEqual({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      user: 'sender@gmail.com',
+      pass: 'abcdefghijklmnop',
+      from: 'Recruiting <sender@gmail.com>',
+    });
+    expect(cfg.emailTimeZone).toBe('Asia/Kolkata');
+    expect(cfg.appBaseUrl).toBe('https://app.example.com');
   });
 
   it('parses provided values', () => {
@@ -40,6 +72,8 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ PORT: 'abc' })).toThrow(/Invalid PORT/);
     expect(() => loadConfig({ JWT_EXPIRES_IN: 'soon' })).toThrow(/Invalid JWT_EXPIRES_IN/);
     expect(() => loadConfig({ TRUST_PROXY: '-1' })).toThrow(/Invalid TRUST_PROXY/);
+    expect(() => loadConfig({ SMTP_PORT: 'x' })).toThrow(/Invalid SMTP_PORT/);
+    expect(() => loadConfig({ EMAIL_TIMEZONE: 'Mars/Base' })).toThrow(/Invalid EMAIL_TIMEZONE/);
   });
 });
 
