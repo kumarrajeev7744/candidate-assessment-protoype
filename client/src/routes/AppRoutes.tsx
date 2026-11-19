@@ -3,6 +3,7 @@ import { Layout } from '../components/Layout';
 import { LandingPage } from '../pages/LandingPage';
 import { LoginPage, DASHBOARD_PATH } from '../pages/LoginPage';
 import { DashboardPage } from '../pages/DashboardPage';
+import { CandidateReportPage } from '../pages/CandidateReportPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { AssessmentLayout } from '../pages/assessment/AssessmentLayout';
 import { AssessmentStartPage } from '../pages/assessment/AssessmentStartPage';
@@ -27,6 +28,7 @@ export function AppRoutes() {
         <Route path="admin" element={<ProtectedRoute />}>
           <Route index element={<Navigate to={DASHBOARD_PATH} replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="candidates/:candidateId" element={<CandidateReportPage />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Route>

@@ -17,3 +17,29 @@ export const createInvitationSchema = z.object({
 });
 
 export type CreateInvitationInput = z.infer<typeof createInvitationSchema>;
+
+/** Query string for the recruiter candidate list (GET /api/invitations). */
+export const listInvitationsQuerySchema = z.object({
+  search: z
+    .string({ error: 'search must be text' })
+    .trim()
+    .max(100, 'search must be at most 100 characters')
+    .optional()
+    .default(''),
+  page: z.coerce
+    .number({ error: 'page must be a number' })
+    .int('page must be a whole number')
+    .min(1, 'page must be at least 1')
+    .max(10_000, 'page is too large')
+    .optional()
+    .default(1),
+  limit: z.coerce
+    .number({ error: 'limit must be a number' })
+    .int('limit must be a whole number')
+    .min(1, 'limit must be at least 1')
+    .max(100, 'limit must be at most 100')
+    .optional()
+    .default(50),
+});
+
+export type ListInvitationsQuery = z.infer<typeof listInvitationsQuerySchema>;
