@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../services/apiClient';
 import { listCandidates, resendConfirmationEmail, resendInvitation } from '../services/recruiterService';
 import type { CandidateListItem, CandidateListResponse, InvitationActionResult } from '../types/recruiter';
@@ -7,6 +7,8 @@ import { formatShortDateTime } from '../utils/format';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { CreateCandidateDialog } from '../components/dashboard/CreateCandidateDialog';
 import { StatusBadge } from '../components/dashboard/StatusBadge';
+import { Icon } from '../components/ui/Icon';
+import { ActionsMenu, type MenuAction } from '../components/ui/ActionsMenu';
 
 /** Tunable for tests. */
 export const dashboardSettings = { searchDebounceMs: 300, pageSize: 50 };
@@ -19,6 +21,7 @@ function errorText(err: unknown, fallback: string): string {
 }
 
 export function DashboardPage() {
+  const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -139,34 +142,82 @@ export function DashboardPage() {
     }
   }
 
+  /** Row actions shown in the "⋯" menu (only those that apply to this candidate). */
+  function rowActions(item: CandidateListItem): MenuAction[] {
+    const actions: MenuAction[] = [];
+    // Reports are only meaningful once the candidate has submitted.
+    if (item.status === 'Completed') {
+      actions.push({
+        label: 'View report',
+        ariaLabel: `Open report for ${item.candidate.name}`,
+        icon: 'eye',
+        onSelect: () => navigate(`/admin/candidates/${item.candidate.id}`),
+      });
+    }
+    if (item.canResendInvitation) {
+      actions.push({
+        label: 'Resend invitation',
+        ariaLabel: `Resend invitation to ${item.candidate.name}`,
+        icon: 'mail',
+        onSelect: () => setResendTarget(item),
+      });
+    }
+    if (item.canResendConfirmation) {
+      actions.push({
+        label: 'Resend confirmation email',
+        ariaLabel: `Resend confirmation email to ${item.candidate.name}`,
+        icon: 'checkCircle',
+        onSelect: () => void handleResendConfirmation(item),
+      });
+    }
+    return actions;
+  }
+
   const items = data?.items ?? [];
   const pagination = data?.pagination;
   const firstLoad = loading && !data;
 
   return (
-    <section className="page dashboard">
-      <div className="dashboard-header">
-        <h1>Candidates</h1>
+    <section className="page page-plain dashboard">
+      <div className="page-header dashboard-header">
+        <div>
+          <span className="eyebrow">Recruiter dashboard</span>
+          <h1>Candidates</h1>
+          <p className="page-subtitle">Invite candidates, follow their progress and open their reports.</p>
+        </div>
         <div className="dashboard-actions">
           <button type="button" className="button-secondary" onClick={refresh} disabled={loading}>
+            <Icon name="refresh" size={16} />
             {loading && data ? 'Refreshing…' : 'Refresh'}
           </button>
           <button type="button" className="button-primary" onClick={() => setCreating(true)}>
+            <Icon name="plus" size={16} />
             Create Candidate
           </button>
         </div>
       </div>
 
-      <div className="field search-field">
-        <label htmlFor="candidate-search">Search by name or email</label>
-        <input
-          id="candidate-search"
-          type="search"
-          value={searchInput}
-          maxLength={100}
-          placeholder="e.g. Priya or priya@example.com"
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
+      <div className="toolbar card">
+        <div className="field search-field">
+          <label htmlFor="candidate-search">Search by name or email</label>
+          <div className="input-with-icon">
+            <Icon name="search" />
+            <input
+              id="candidate-search"
+              type="search"
+              value={searchInput}
+              maxLength={100}
+              placeholder="e.g. Priya or priya@example.com"
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
+        </div>
+        {pagination && (
+          <p className="toolbar-count">
+            <strong>{pagination.total}</strong> {pagination.total === 1 ? 'candidate' : 'candidates'}
+            {data?.search ? ' found' : ''}
+          </p>
+        )}
       </div>
 
       {feedback && (
@@ -181,7 +232,12 @@ export function DashboardPage() {
         </div>
       )}
 
-      {firstLoad && <p role="status">Loading candidates…</p>}
+      {firstLoad && (
+        <p role="status" className="loading-state">
+          <span className="spinner" aria-hidden="true" />
+          Loading candidates…
+        </p>
+      )}
 
       {loadError && (
         <div className="form-error" role="alert">
@@ -194,11 +250,14 @@ export function DashboardPage() {
 
       {data && !loadError && items.length === 0 && (
         <div className="empty-state">
+          <span className="status-icon status-icon-brand">
+            <Icon name={data.search ? 'search' : 'user'} size={24} />
+          </span>
           {data.search ? (
-            <p>No candidates match “{data.search}”.</p>
+            <p className="empty-title">No candidates match “{data.search}”.</p>
           ) : (
             <>
-              <p>No candidates yet.</p>
+              <p className="empty-title">No candidates yet.</p>
               <p className="field-hint">Use “Create Candidate” to invite your first candidate.</p>
             </>
           )}
@@ -236,34 +295,16 @@ export function DashboardPage() {
                   </td>
                   <td data-label="Actions">
                     <div className="row-actions">
-                      <Link
-                        to={`/admin/candidates/${item.candidate.id}`}
-                        className="button-secondary button-small"
-                        aria-label={`Open report for ${item.candidate.name}`}
-                      >
-                        Report
-                      </Link>
-                      {item.canResendInvitation && (
-                        <button
-                          type="button"
-                          className="button-secondary button-small"
-                          disabled={busyId === item.id}
-                          onClick={() => setResendTarget(item)}
-                          aria-label={`Resend invitation to ${item.candidate.name}`}
-                        >
-                          Resend invitation
-                        </button>
-                      )}
-                      {item.canResendConfirmation && (
-                        <button
-                          type="button"
-                          className="button-secondary button-small"
-                          disabled={busyId === item.id}
-                          onClick={() => void handleResendConfirmation(item)}
-                          aria-label={`Resend confirmation email to ${item.candidate.name}`}
-                        >
-                          {busyId === item.id ? 'Sending…' : 'Resend confirmation'}
-                        </button>
+                      <ActionsMenu
+                        label={`More actions for ${item.candidate.name}`}
+                        disabled={busyId === item.id}
+                        actions={rowActions(item)}
+                      />
+                      {busyId === item.id && (
+                        <span className="row-busy">
+                          <span className="spinner" aria-hidden="true" />
+                          Sending…
+                        </span>
                       )}
                     </div>
                   </td>

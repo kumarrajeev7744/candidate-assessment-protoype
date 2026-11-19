@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ApiError } from '../services/apiClient';
 import { isValidEmail } from '../utils/validation';
+import { BrandMark, Icon } from '../components/ui/Icon';
 
 export const DASHBOARD_PATH = '/admin/dashboard';
 
@@ -65,8 +66,26 @@ export function LoginPage() {
   }
 
   return (
+    <div className="auth-layout">
+      <aside className="auth-aside" aria-hidden="true">
+        <BrandMark size={44} />
+        <span className="eyebrow eyebrow-on-dark">Recruiter workspace</span>
+        <p className="auth-aside-title">Assess sales talent with structured written and video responses.</p>
+        <ul className="auth-aside-points">
+          <li>
+            <Icon name="check" size={16} /> Invite candidates and track progress
+          </li>
+          <li>
+            <Icon name="check" size={16} /> Review answers and videos side by side
+          </li>
+          <li>
+            <Icon name="check" size={16} /> Share single responses securely
+          </li>
+        </ul>
+      </aside>
     <section className="page auth-page">
       <h1>Recruiter login</h1>
+      <p className="page-subtitle auth-subtitle">Sign in with your administrator account.</p>
       {notice && !formError && (
         <p className="notice" role="status">
           {notice}
@@ -83,6 +102,7 @@ export function LoginPage() {
           <input
             id="email"
             type="email"
+            placeholder="you@company.com"
             autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -114,10 +134,11 @@ export function LoginPage() {
             </span>
           )}
         </div>
-        <button type="submit" className="button-primary" disabled={submitting}>
+        <button type="submit" className="button-primary button-block" disabled={submitting}>
           {submitting ? 'Signing in…' : 'Log in'}
         </button>
       </form>
     </section>
+    </div>
   );
 }

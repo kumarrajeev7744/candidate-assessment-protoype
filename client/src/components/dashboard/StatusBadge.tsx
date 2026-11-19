@@ -1,7 +1,7 @@
 import type { CandidateListItem } from '../../types/recruiter';
 
 const CLASS: Record<CandidateListItem['status'], string> = {
-  Invited: 'badge',
+  Invited: 'badge badge-neutral',
   'In Progress': 'badge badge-info',
   Completed: 'badge badge-success',
 };

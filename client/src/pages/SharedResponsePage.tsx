@@ -5,6 +5,7 @@ import { getSharedResponse } from '../services/reportService';
 import type { SharedResponse } from '../types/report';
 import { formatDateTime } from '../utils/format';
 import { RefreshingVideo } from '../components/report/RefreshingVideo';
+import { Icon } from '../components/ui/Icon';
 
 type View =
   | { kind: 'loading' }
@@ -38,20 +39,31 @@ export function SharedResponsePage() {
 
   return (
     <section className="page candidate-page shared-response">
-      {view.kind === 'loading' && <p role="status">Loading shared response…</p>}
+      {view.kind === 'loading' && (
+        <p role="status" className="loading-state">
+          <span className="spinner" aria-hidden="true" />
+          Loading shared response…
+        </p>
+      )}
 
       {view.kind === 'invalid' && (
-        <>
+        <div className="state-page">
+          <span className="status-icon status-icon-danger">
+            <Icon name="link" size={26} />
+          </span>
           <h1>Link not valid</h1>
           <p>This link is invalid. Please check that you copied the full link from the email.</p>
-        </>
+        </div>
       )}
 
       {view.kind === 'expired' && (
-        <>
+        <div className="state-page">
+          <span className="status-icon status-icon-warning">
+            <Icon name="clock" size={26} />
+          </span>
           <h1>Link expired</h1>
           <p>This link has expired. Shared links are valid for 7 days. Please ask the recruiter to share the response again.</p>
-        </>
+        </div>
       )}
 
       {view.kind === 'error' && (
@@ -75,26 +87,44 @@ export function SharedResponsePage() {
 
       {view.kind === 'ready' && (
         <>
-          <p className="field-hint">Shared candidate response · read-only</p>
+          <div className="shared-banner">
+            <span className="shared-pill">
+              <Icon name="eye" size={14} /> Shared candidate response · read-only
+            </span>
+          </div>
+          <span className="eyebrow">Candidate</span>
           <h1>{view.data.candidateName}</h1>
-          <h2>Question {view.data.question.number}</h2>
-          <p className="review-question">{view.data.question.text}</p>
+          <div className="shared-question">
+            <span className="question-chip" aria-hidden="true">
+              {view.data.question.number}
+            </span>
+            <div>
+              <h2>Question {view.data.question.number}</h2>
+              <p className="review-question">{view.data.question.text}</p>
+            </div>
+          </div>
 
-          <h3 className="report-subheading">Written answer</h3>
+          <h3 className="report-subheading">
+            <Icon name="text" size={15} /> Written answer
+          </h3>
           {view.data.response.writtenAnswer.trim() ? (
-            <p className="review-answer">{view.data.response.writtenAnswer}</p>
+            <p className="answer-block">{view.data.response.writtenAnswer}</p>
           ) : (
-            <p className="review-missing">No written answer</p>
+            <p className="missing-block">No written answer</p>
           )}
 
-          <h3 className="report-subheading">Video answer</h3>
+          <h3 className="report-subheading">
+            <Icon name="video" size={15} /> Video answer
+          </h3>
           {view.data.response.video.available ? (
             <RefreshingVideo video={view.data.response.video} label="Video answer" onRefresh={refreshVideo} />
           ) : (
-            <p className="review-missing">No video was recorded for this question.</p>
+            <p className="missing-block">No video was recorded for this question.</p>
           )}
 
-          <p className="field-hint">This link expires on {formatDateTime(view.data.expiresAt)}.</p>
+          <p className="field-hint shared-expiry">
+            <Icon name="clock" size={14} /> This link expires on {formatDateTime(view.data.expiresAt)}.
+          </p>
         </>
       )}
     </section>

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import * as authService from '../services/authService';
 import { setUnauthorizedHandler } from '../services/apiClient';
+import { broadcastLogout, onLogoutInOtherTab } from '../utils/authBroadcast';
 import {
   clearStoredSession,
   getStoredSession,
@@ -12,6 +13,7 @@ import type { Admin } from '../types/auth';
 export type AuthStatus = 'checking' | 'authenticated' | 'unauthenticated';
 
 export const SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please log in again.';
+export const LOGGED_OUT_ELSEWHERE_MESSAGE = 'You have been logged out in another tab.';
 
 interface AuthState {
   status: AuthStatus;
@@ -90,7 +92,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     authService.logout().catch(() => undefined); // best effort; the token is discarded locally
     endSession(null);
+    broadcastLogout(); // other open tabs end their copy of the session too
   }, [endSession]);
+
+  // A logout in another tab ends the session here as well.
+  useEffect(
+    () =>
+      onLogoutInOtherTab(() => {
+        if (getStoredSession()) endSession(LOGGED_OUT_ELSEWHERE_MESSAGE);
+      }),
+    [endSession],
+  );
 
   const value = useMemo<AuthContextValue>(() => ({ ...state, login, logout }), [state, login, logout]);
 

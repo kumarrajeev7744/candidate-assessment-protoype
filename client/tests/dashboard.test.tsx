@@ -128,6 +128,13 @@ async function openDashboard(backend: Backend) {
   return api;
 }
 
+/** Opens the "⋯" menu for a candidate and chooses an action by its accessible name. */
+async function chooseAction(candidate: string, actionName: string) {
+  await userEvent.click(screen.getByRole('button', { name: `More actions for ${candidate}` }));
+  const menu = await screen.findByRole('menu', { name: `More actions for ${candidate}` });
+  await userEvent.click(within(menu).getByRole('menuitem', { name: actionName }));
+}
+
 const listCalls = (api: ReturnType<typeof installBackend>) => api.calls.filter((c) => c.method === 'GET' && c.path === '/invitations');
 const rowFor = (name: string) => screen.getByRole('cell', { name }).closest('tr')!;
 
@@ -174,17 +181,33 @@ describe('Recruiter dashboard', () => {
     expect(listCalls(api)[0]!.auth).toBe('Bearer admin-jwt');
   });
 
-  it('shows the right actions for each status', async () => {
-    await openDashboard({ rows: ROWS });
+  it('puts all row actions in the "⋯" menu, with only the applicable items', async () => {
+    await openDashboard({
+      rows: [
+        ...ROWS,
+        item({ id: 'inv4', name: 'Done Sent', email: 'sent@example.com', status: 'Completed', canResendInvitation: false, canResendConfirmation: false, confirmationEmailStatus: 'Sent' }),
+      ],
+    });
     await screen.findByRole('table');
-    const neha = rowFor('Neha Completed');
-    expect(within(neha).queryByRole('button', { name: /Resend invitation/ })).not.toBeInTheDocument();
-    expect(within(neha).getByRole('button', { name: 'Resend confirmation email to Neha Completed' })).toBeInTheDocument();
-    const arjun = rowFor('Arjun Progress');
-    expect(within(arjun).getByRole('button', { name: 'Resend invitation to Arjun Progress' })).toBeInTheDocument();
-    expect(within(arjun).queryByRole('button', { name: /Resend confirmation/ })).not.toBeInTheDocument();
-    for (const name of ['Neha Completed', 'Arjun Progress', 'Priya Expired']) {
-      expect(within(rowFor(name)).getByRole('link', { name: `Open report for ${name}` })).toBeInTheDocument();
+    const menuItems = async (name: string) => {
+      await userEvent.click(within(rowFor(name)).getByRole('button', { name: `More actions for ${name}` }));
+      const labels = within(screen.getByRole('menu', { name: `More actions for ${name}` }))
+        .getAllByRole('menuitem')
+        .map((m) => m.textContent);
+      await userEvent.keyboard('{Escape}');
+      return labels;
+    };
+
+    expect(await menuItems('Neha Completed')).toEqual(['View report', 'Resend confirmation email']);
+    expect(await menuItems('Done Sent')).toEqual(['View report']);
+    expect(await menuItems('Arjun Progress')).toEqual(['Resend invitation']); // no report until completed
+    expect(await menuItems('Priya Expired')).toEqual(['Resend invitation']);
+
+    // No separate buttons or links outside the menu.
+    for (const name of ['Neha Completed', 'Arjun Progress', 'Priya Expired', 'Done Sent']) {
+      const row = rowFor(name);
+      expect(within(row).queryByRole('link')).not.toBeInTheDocument();
+      expect(within(row).getAllByRole('button')).toHaveLength(1);
     }
   });
 
@@ -225,12 +248,12 @@ describe('Recruiter dashboard', () => {
     expect(await screen.findByRole('cell', { name: 'Late Arrival' })).toBeInTheDocument();
   });
 
-  it('navigates to the candidate report', async () => {
+  it('navigates to the candidate report from the menu', async () => {
     const api = await openDashboard({ rows: ROWS });
     await screen.findByRole('table');
-    await userEvent.click(screen.getByRole('link', { name: 'Open report for Arjun Progress' }));
+    await chooseAction('Neha Completed', 'Open report for Neha Completed');
     expect(await screen.findByRole('heading', { name: 'Candidate not found' })).toBeInTheDocument();
-    expect(api.calls.some((c) => c.path === '/candidates/cand-inv2/report')).toBe(true);
+    expect(api.calls.some((c) => c.path === '/candidates/cand-inv3/report')).toBe(true);
     await userEvent.click(screen.getByRole('link', { name: '← Back to candidates' }));
     expect(await screen.findByRole('heading', { name: 'Candidates' })).toBeInTheDocument();
   });
@@ -361,7 +384,7 @@ describe('Resend actions', () => {
     const api = await openDashboard({ rows: ROWS });
     await screen.findByRole('table');
     const before = listCalls(api).length;
-    await userEvent.click(screen.getByRole('button', { name: 'Resend invitation to Arjun Progress' }));
+    await chooseAction('Arjun Progress', 'Resend invitation to Arjun Progress');
     const dialog = await screen.findByRole('dialog', { name: 'Resend invitation?' });
     expect(dialog).toHaveTextContent('The previous link will stop working');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Resend invitation' }));
@@ -374,7 +397,7 @@ describe('Resend actions', () => {
   it('does not resend when the confirmation dialog is cancelled', async () => {
     const api = await openDashboard({ rows: ROWS });
     await screen.findByRole('table');
-    await userEvent.click(screen.getByRole('button', { name: 'Resend invitation to Priya Expired' }));
+    await chooseAction('Priya Expired', 'Resend invitation to Priya Expired');
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
     expect(api.calls.some((c) => c.path.endsWith('/resend'))).toBe(false);
   });
@@ -385,22 +408,26 @@ describe('Resend actions', () => {
       resendResult: { status: 503, body: { error: { code: 'EMAIL_NOT_CONFIGURED', message: 'Email service is not configured.' } } },
     });
     await screen.findByRole('table');
-    await userEvent.click(screen.getByRole('button', { name: 'Resend invitation to Arjun Progress' }));
+    await chooseAction('Arjun Progress', 'Resend invitation to Arjun Progress');
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Resend invitation' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not resend the invitation to arjun@example.com. Email service is not configured.',
     );
   });
 
-  it('resends a failed confirmation email and hides the action once sent', async () => {
+  it('resends a failed confirmation email and removes that action once sent', async () => {
     const api = await openDashboard({ rows: ROWS });
     await screen.findByRole('table');
-    await userEvent.click(screen.getByRole('button', { name: 'Resend confirmation email to Neha Completed' }));
+    await chooseAction('Neha Completed', 'Resend confirmation email to Neha Completed');
     expect(await screen.findByText('Confirmation email sent to neha@example.com.')).toBeInTheDocument();
     expect(api.calls.some((c) => c.method === 'POST' && c.path === '/invitations/inv3/resend-confirmation')).toBe(true);
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Resend confirmation email to Neha Completed' })).not.toBeInTheDocument(),
-    );
+    // After the list refreshes, only "View report" remains for Neha.
+    await waitFor(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'More actions for Neha Completed' }));
+      const labels = within(screen.getByRole('menu')).getAllByRole('menuitem').map((m) => m.textContent);
+      await userEvent.keyboard('{Escape}');
+      expect(labels).toEqual(['View report']);
+    });
   });
 
   it('reports a confirmation email that failed again', async () => {
@@ -409,7 +436,7 @@ describe('Resend actions', () => {
       confirmationResult: { status: 200, body: { candidate: {}, invitation: {}, email: { sent: false, error: 'The email could not be delivered.' } } },
     });
     await screen.findByRole('table');
-    await userEvent.click(screen.getByRole('button', { name: 'Resend confirmation email to Neha Completed' }));
+    await chooseAction('Neha Completed', 'Resend confirmation email to Neha Completed');
     expect(await screen.findByText(/could not be sent: The email could not be delivered/)).toBeInTheDocument();
   });
 
@@ -419,7 +446,41 @@ describe('Resend actions', () => {
       confirmationResult: { status: 409, body: { error: { code: 'CONFIRMATION_ALREADY_SENT', message: 'The confirmation email has already been sent.' } } },
     });
     await screen.findByRole('table');
-    await userEvent.click(screen.getByRole('button', { name: 'Resend confirmation email to Neha Completed' }));
+    await chooseAction('Neha Completed', 'Resend confirmation email to Neha Completed');
     expect(await screen.findByRole('alert')).toHaveTextContent('The confirmation email has already been sent.');
+  });
+});
+
+describe('Row actions menu', () => {
+  it('works with the keyboard and closes on outside click', async () => {
+    await openDashboard({ rows: ROWS });
+    await screen.findByRole('table');
+    const trigger = screen.getByRole('button', { name: 'More actions for Arjun Progress' });
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    trigger.focus();
+    await userEvent.keyboard('{ArrowDown}');
+    const menu = screen.getByRole('menu');
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(within(menu).getByRole('menuitem', { name: 'Resend invitation to Arjun Progress' })).toHaveFocus();
+
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+
+    await userEvent.click(trigger);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('heading', { name: 'Candidates' }));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('opens the resend confirmation dialog from the keyboard', async () => {
+    await openDashboard({ rows: ROWS });
+    await screen.findByRole('table');
+    screen.getByRole('button', { name: 'More actions for Priya Expired' }).focus();
+    await userEvent.keyboard('{Enter}');
+    await userEvent.keyboard('{Enter}');
+    expect(await screen.findByRole('dialog', { name: 'Resend invitation?' })).toBeInTheDocument();
   });
 });

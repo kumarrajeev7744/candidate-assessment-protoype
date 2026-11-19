@@ -4,6 +4,7 @@ import { useAssessment } from '../../context/AssessmentContext';
 import { ApiError } from '../../services/apiClient';
 import { formatDateTime } from '../../utils/format';
 import { resumePath } from './resumePosition';
+import { Icon } from '../../components/ui/Icon';
 
 export function AssessmentStartPage() {
   const { token, data, firstIncompleteNumber, start, reload, submission } = useAssessment();
@@ -39,9 +40,13 @@ export function AssessmentStartPage() {
   const videoMinutes = Math.round(assessment.videoMaxSeconds / 60);
 
   return (
-    <section className="page candidate-page">
-      <h1>Welcome, {candidate.name}</h1>
-      <dl className="details">
+    <section className="page candidate-page start-page">
+      <div className="start-hero">
+        <span className="eyebrow eyebrow-on-dark">Candidate assessment</span>
+        <h1>Welcome, {candidate.name}</h1>
+        <p>Thank you for taking part. Please read the instructions before you begin.</p>
+      </div>
+      <dl className="details start-details">
         <div>
           <dt>Name</dt>
           <dd>{candidate.name}</dd>
@@ -55,6 +60,25 @@ export function AssessmentStartPage() {
           <dd>{formatDateTime(assessment.expiresAt)}</dd>
         </div>
       </dl>
+
+      <div className="start-overview" aria-hidden="true">
+        <div>
+          <Icon name="text" />
+          <span>
+            <strong>{assessment.totalQuestions}</strong> fixed questions
+          </span>
+        </div>
+        <div>
+          <Icon name="video" />
+          <span>
+            <strong>{videoMinutes} min</strong> video each
+          </span>
+        </div>
+        <div>
+          <Icon name="clock" />
+          <span>Resume any time</span>
+        </div>
+      </div>
 
       <h2>Before you begin</h2>
       <ul className="instructions">
@@ -86,9 +110,12 @@ export function AssessmentStartPage() {
           {error}
         </p>
       )}
-      <button type="button" className="button-primary" onClick={handleStart} disabled={starting}>
-        {starting ? 'Starting…' : 'Start Assessment'}
-      </button>
+      <div className="start-actions">
+        <button type="button" className="button-primary" onClick={handleStart} disabled={starting}>
+          {starting ? 'Starting…' : 'Start Assessment'}
+          {!starting && <Icon name="arrowRight" size={16} />}
+        </button>
+      </div>
     </section>
   );
 }

@@ -7,6 +7,7 @@ import { VideoPlayer } from '../../components/assessment/VideoPlayer';
 import { ApiError } from '../../services/apiClient';
 import type { AssessmentQuestion, MissingResponse } from '../../types/assessment';
 import { storePosition } from '../../utils/assessmentPosition';
+import { Icon } from '../../components/ui/Icon';
 
 function describeSubmitError(err: unknown): string {
   if (err instanceof UnsavedChangesError) return err.message;
@@ -72,7 +73,8 @@ export function ReviewPage() {
   }
 
   return (
-    <section className="page candidate-page">
+    <section className="page candidate-page review-page">
+      <span className="eyebrow">Final step</span>
       <h1>Review your answers</h1>
       <ProgressIndicator completed={completedCount} total={total} />
       <p className="review-summary">
@@ -121,9 +123,9 @@ export function ReviewPage() {
               </div>
               <p className="review-question">{q.questionText}</p>
               {answer ? (
-                <p className="review-answer">{answer}</p>
+                <p className="answer-block">{answer}</p>
               ) : (
-                <p className="review-missing">No written answer yet</p>
+                <p className="missing-block">No written answer yet</p>
               )}
               {unsaved && <p className="field-error">This answer has unsaved changes.</p>}
               <div className="review-video">
@@ -145,8 +147,9 @@ export function ReviewPage() {
         })}
       </ol>
 
-      <div className="question-nav">
+      <div className="question-nav submit-bar">
         <Link to={`../questions/${total}`} relative="path" className="button-secondary">
+          <Icon name="arrowLeft" size={16} />
           Back to question {total}
         </Link>
         <button

@@ -6,17 +6,23 @@ import type { CandidateReport, ReportQuestion } from '../types/report';
 import { formatShortDateTime } from '../utils/format';
 import { RefreshingVideo } from '../components/report/RefreshingVideo';
 import { ShareResponseDialog } from '../components/report/ShareResponseDialog';
+import { Icon } from '../components/ui/Icon';
 
 const STATUS_CLASS: Record<string, string> = {
-  Invited: 'badge',
+  Invited: 'badge badge-neutral',
   'In Progress': 'badge badge-info',
   Completed: 'badge badge-success',
 };
 const QUESTION_CLASS: Record<ReportQuestion['status'], string> = {
   Complete: 'badge badge-success',
   Incomplete: 'badge badge-warning',
-  'Not Started': 'badge',
+  'Not Started': 'badge badge-neutral',
 };
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? (parts.at(-1)?.[0] ?? '') : '')).toUpperCase();
+}
 
 function videoStatusText(q: ReportQuestion): string {
   const status = q.response?.video.status ?? 'Missing';
@@ -78,15 +84,18 @@ export function CandidateReportPage() {
   );
 
   const back = (
-    <p>
+    <p className="back-link">
       <Link to="/admin/dashboard">← Back to candidates</Link>
     </p>
   );
 
   if (error) {
     return (
-      <section className="page">
+      <section className="page state-page">
         {back}
+        <span className={error.notFound ? 'status-icon status-icon-brand' : 'status-icon status-icon-danger'}>
+          <Icon name="alert" size={26} />
+        </span>
         <h1>{error.notFound ? 'Candidate not found' : 'Could not load the report'}</h1>
         <p className="form-error" role="alert">
           {error.message}
@@ -102,21 +111,41 @@ export function CandidateReportPage() {
 
   if (!report) {
     return (
-      <section className="page">
+      <section className="page page-plain report">
         {back}
-        <p role="status">Loading report…</p>
+        <p role="status" className="loading-state">
+          <span className="spinner" aria-hidden="true" />
+          Loading report…
+        </p>
       </section>
     );
   }
 
   const { candidate, assessment, questions, summary } = report;
   return (
-    <section className="page report">
+    <section className="page page-plain report">
       {back}
+      <div className="card profile-card">
       <div className="report-header">
-        <h1>{candidate.name}</h1>
-        <span className={STATUS_CLASS[assessment.status]}>{assessment.status}</span>
-        {assessment.isExpired && <span className="badge badge-danger">Expired</span>}
+        <span className="avatar avatar-lg" aria-hidden="true">
+          {initials(candidate.name)}
+        </span>
+        <div className="report-identity">
+          <span className="eyebrow">Candidate report</span>
+          <div className="report-title-row">
+            <h1>{candidate.name}</h1>
+            <span className={STATUS_CLASS[assessment.status]}>{assessment.status}</span>
+            {assessment.isExpired && <span className="badge badge-danger">Expired</span>}
+          </div>
+        </div>
+      </div>
+      <div className="report-summary">
+        <div className="progress-bar" aria-hidden="true">
+          <div
+            className="progress-fill"
+            style={{ width: `${Math.round((summary.completedQuestions / Math.max(1, summary.totalQuestions)) * 100)}%` }}
+          />
+        </div>
       </div>
       <dl className="details report-details">
         <div>
@@ -149,23 +178,28 @@ export function CandidateReportPage() {
       {assessment.status !== 'Completed' && (
         <p className="notice">This assessment has not been submitted yet. Responses can be shared once it is completed.</p>
       )}
+      </div>
 
       <ol className="report-list">
         {questions.map((q) => {
           const missingVideo = videoStatusText(q);
           return (
             <li key={q.questionId} className="report-item" aria-label={`Question ${q.questionNumber}`}>
-              <div className="review-item-header">
+              <div className="report-item-header">
+                <span className="question-chip" aria-hidden="true">
+                  {q.questionNumber}
+                </span>
                 <h2>Question {q.questionNumber}</h2>
-                <div className="row-actions">
+                <div className="row-actions report-item-actions">
                   <span className={QUESTION_CLASS[q.status]}>{q.status}</span>
                   {q.canShare && q.response && (
                     <button
                       type="button"
-                      className="button-secondary button-small"
+                      className="button-primary button-small"
                       onClick={() => setShareTarget(q)}
                       aria-label={`Share question ${q.questionNumber}`}
                     >
+                      <Icon name="share" size={15} />
                       Share
                     </button>
                   )}
@@ -173,14 +207,18 @@ export function CandidateReportPage() {
               </div>
               <p className="review-question">{q.questionText}</p>
 
-              <h3 className="report-subheading">Written answer</h3>
+              <h3 className="report-subheading">
+                <Icon name="text" size={15} /> Written answer
+              </h3>
               {q.response?.hasWrittenAnswer ? (
-                <p className="review-answer">{q.response.writtenAnswer}</p>
+                <p className="answer-block">{q.response.writtenAnswer}</p>
               ) : (
-                <p className="review-missing">No written answer</p>
+                <p className="missing-block">No written answer</p>
               )}
 
-              <h3 className="report-subheading">Video answer</h3>
+              <h3 className="report-subheading">
+                <Icon name="video" size={15} /> Video answer
+              </h3>
               {q.response?.video.available ? (
                 <RefreshingVideo
                   video={q.response.video}
@@ -188,7 +226,7 @@ export function CandidateReportPage() {
                   onRefresh={() => refreshVideo(q.questionId)}
                 />
               ) : (
-                <p className="review-missing">{missingVideo}</p>
+                <p className="missing-block">{missingVideo}</p>
               )}
             </li>
           );
