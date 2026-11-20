@@ -4,7 +4,7 @@ import { AppError } from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
 import { assertObjectId } from './reportService.js';
 import { getVideoStorage, isVideoStorageConfigured } from './storage/videoStorage.js';
-import { videoKeyPrefix } from './videoService.js';
+import { legacyVideoKeyPrefix, videoKeyPrefix } from './videoService.js';
 
 export interface DeletionResult {
   deleted: { candidate: number; invitations: number; responses: number; shareLinks: number; videos: number };
@@ -38,8 +38,11 @@ export async function deleteCandidate(candidateId: string): Promise<DeletionResu
     const storage = getVideoStorage();
     try {
       const questionIds = await Question.find().select('_id').lean();
-      for (const q of questionIds) {
-        for (const key of await storage.listObjectKeys(videoKeyPrefix(candidateId, q._id.toString()))) keys.add(key);
+      const prefixes = questionIds.map((q) => videoKeyPrefix(candidateId, q._id.toString()));
+      // Videos uploaded before opaque keys were introduced live under videos/{candidateId}/.
+      prefixes.push(legacyVideoKeyPrefix(candidateId));
+      for (const prefix of prefixes) {
+        for (const key of await storage.listObjectKeys(prefix)) keys.add(key);
       }
     } catch (err) {
       logger.error('Could not list candidate videos for deletion', { candidateId, error: err instanceof Error ? err.name : 'UnknownError' });

@@ -2,6 +2,11 @@ import mongoose from 'mongoose';
 import { logger } from '../utils/logger.js';
 
 const SERVER_SELECTION_TIMEOUT_MS = 10_000;
+/**
+ * Connections per API instance. ~100 candidates need far fewer; keeping the pool small leaves room in
+ * the Atlas connection limit when App Runner scales out to several instances.
+ */
+export const MAX_POOL_SIZE = 10;
 
 /**
  * Returns a credential-free description of a MongoDB URI (scheme, hosts and database)
@@ -52,6 +57,9 @@ export async function connectDatabase(
   try {
     await mongoose.connect(validUri, {
       serverSelectionTimeoutMS: options.serverSelectionTimeoutMS ?? SERVER_SELECTION_TIMEOUT_MS,
+      maxPoolSize: MAX_POOL_SIZE,
+      // Fail queries quickly instead of hanging while Atlas is unreachable (the driver keeps reconnecting).
+      socketTimeoutMS: 45_000,
     });
   } catch (err) {
     throw new Error(

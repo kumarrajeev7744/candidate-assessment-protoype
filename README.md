@@ -27,10 +27,10 @@ cp server/.env.example server/.env
 
 | Package | Variable | Description | Default |
 |---|---|---|---|
-| client | `VITE_API_BASE_URL` | Base URL of the backend API | `http://localhost:4000/api` |
+| client | `VITE_API_BASE_URL` | Base URL of the backend API (build time). **Required** for production builds | `http://localhost:4000/api` (dev server only) |
 | server | `PORT` | Port the API listens on | `4000` |
 | server | `NODE_ENV` | `development`, `test` or `production` | `development` |
-| server | `CLIENT_URL` | Allowed CORS origin(s), comma-separated | `http://localhost:5173` |
+| server | `CLIENT_URL` | Allowed CORS origin(s), comma-separated. In production: required, `https://`, origin only | `http://localhost:5173` |
 | server | `MONGODB_URI` | MongoDB Atlas connection string (**required** to start the API) | – |
 | server | `JWT_SECRET` | Random secret, ≥ 32 characters (**required** to start the API) | – |
 | server | `JWT_EXPIRES_IN` | Admin token lifetime (`3600`, `30m`, `1h`, …) | `1h` |
@@ -201,7 +201,7 @@ Videos go **directly from the browser to a private S3 bucket** using short-lived
 
 1. **Create the bucket** (e.g. in `ap-south-1`): keep **Block all public access** on, default encryption SSE-S3, no bucket policy granting public access.
 2. **CORS** (Bucket → Permissions → CORS): paste [`docs/aws/s3-cors.json`](docs/aws/s3-cors.json) and add the CloudFront origin when deployed.
-3. **IAM**: create a policy from [`docs/aws/s3-app-policy.json`](docs/aws/s3-app-policy.json) (replace the bucket name). Locally, attach it to a dedicated IAM user and put its access keys in `server/.env` (or use `AWS_PROFILE`). On App Runner, attach it to the instance role instead of using keys.
+3. **IAM**: create a policy from [`docs/aws/iam-policy.json`](docs/aws/iam-policy.json) (replace the bucket name). Locally, attach it to a dedicated IAM user and put its access keys in `server/.env` (or use `AWS_PROFILE`). On App Runner, attach it to the instance role instead of using keys.
 4. Set `AWS_REGION` and `S3_VIDEO_BUCKET` in `server/.env`.
 
 Flow per question: `POST …/video-upload-url` → browser `PUT` to S3 (with progress; 1 attempt + 2 automatic retries) → `POST …/video-confirm` (server checks the object exists in S3, its type and size, then saves the metadata and deletes the replaced video). Playback uses `GET …/video-url` (presigned GET, 15 minutes).
@@ -228,7 +228,7 @@ npm run dev:server   # API on http://localhost:4000 (auto-reload)
 npm run dev:client   # Frontend on http://localhost:5173
 ```
 
-Health check: `GET http://localhost:4000/api/health`
+Health checks: `GET http://localhost:4000/api/health` (liveness, always 200) and `GET /api/health/ready` (200 only while MongoDB is connected, otherwise 503).
 
 ## Tests
 
@@ -244,10 +244,39 @@ npm run test:server  # backend tests
 
 ```bash
 npm run build          # both packages
-npm run build:client   # -> client/dist (static files for S3/CloudFront)
+npm run build:client   # -> client/dist (static files for S3/CloudFront); needs VITE_API_BASE_URL
 npm run build:server   # -> server/dist
 npm start --workspace server   # run the compiled API
 ```
+
+## Production deployment (AWS)
+
+Target: frontend on **S3 + CloudFront**, API on **AWS App Runner** (managed Node.js 22 runtime, built from source; no Docker), **MongoDB Atlas**, private **S3** video bucket, **Gmail SMTP**, secrets in **AWS Secrets Manager**, logs in **CloudWatch**. Nothing has been provisioned yet.
+
+| Document | Contents |
+|---|---|
+| [docs/aws/architecture.md](docs/aws/architecture.md) | Components, request flows, which settings must match |
+| [docs/aws/deployment-checklist.md](docs/aws/deployment-checklist.md) | Step-by-step checklist (Atlas, secrets, IAM, S3, CloudFront, App Runner, smoke test, rollback) |
+| [docs/aws/app-runner.md](docs/aws/app-runner.md) | Build/start commands, env vars and secrets, instance role, health checks, monitoring, seeding |
+| [docs/aws/frontend-cloudfront.md](docs/aws/frontend-cloudfront.md) | Frontend bucket, CloudFront, SPA routing, caching, upload commands |
+| [docs/aws/s3-configuration.md](docs/aws/s3-configuration.md) | Video bucket settings, CORS, presigned URLs, legacy video keys |
+| [docs/aws/production.env.example](docs/aws/production.env.example) | Every production variable (placeholders only) |
+| `docs/aws/*.json`, `cloudfront-spa-rewrite.js` | IAM, bucket, CORS and lifecycle policies; CloudFront Function |
+
+Production commands (as run by App Runner):
+
+```bash
+npm ci --workspace server && npm run build --workspace server && npm ci --workspace server --omit=dev
+node server/dist/server.js
+```
+
+Production frontend build (fails if `VITE_API_BASE_URL` is missing):
+
+```bash
+VITE_API_BASE_URL=https://<APP_RUNNER_SERVICE_DOMAIN>/api npm run build:client
+```
+
+With `NODE_ENV=production` the API refuses to start without an `https://` `CLIENT_URL`, a `MONGODB_URI` and a strong `JWT_SECRET`, and logs warnings for risky settings (for example `TRUST_PROXY=0` or AWS access keys in the environment). It also sends security headers (HSTS, `nosniff`, `X-Frame-Options`, `no-referrer`, a restrictive CSP), logs one JSON line per request with tokens redacted, and shuts down gracefully on `SIGTERM`.
 
 ## Code quality
 

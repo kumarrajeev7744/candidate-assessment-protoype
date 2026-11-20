@@ -4,6 +4,8 @@ import { config } from './config/env.js';
 import { createApiRouter } from './routes/index.js';
 import { notFound } from './middleware/notFound.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { securityHeaders } from './middleware/securityHeaders.js';
+import { requestLogger } from './middleware/requestLogger.js';
 import type { RateLimitOptions } from './middleware/rateLimiters.js';
 
 export interface AppOptions {
@@ -15,6 +17,9 @@ export function createApp(options: AppOptions = {}): Express {
 
   app.disable('x-powered-by');
   if (config.trustProxy > 0) app.set('trust proxy', config.trustProxy);
+
+  app.use(requestLogger);
+  app.use(securityHeaders({ hsts: config.nodeEnv === 'production' }));
 
   app.use(
     cors({

@@ -36,6 +36,16 @@ export function videoKeyPrefix(candidateId: string, questionId: string): string 
   return `videos/${digest}/`;
 }
 
+/**
+ * Folder used by the first video implementation: videos/{candidateId}/{questionId}/...
+ * Objects with these keys are still valid (playback uses the key stored in MongoDB); this prefix is only
+ * needed to find leftover files when a candidate is deleted. New uploads never use it.
+ */
+export function legacyVideoKeyPrefix(candidateId: string): string {
+  if (!/^[a-f0-9]{24}$/i.test(candidateId)) throw new Error('Invalid candidate ID');
+  return `videos/${candidateId.toLowerCase()}/`;
+}
+
 function keyPrefix(session: CandidateSession, questionId: string): string {
   return videoKeyPrefix(session.candidateId.toString(), questionId);
 }
