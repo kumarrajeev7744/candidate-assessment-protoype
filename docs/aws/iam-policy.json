@@ -1,0 +1,28 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "VideoObjects",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::<VIDEO_BUCKET_NAME>/videos/*"
+    },
+    {
+      "Sid": "ListVideoPrefixForDeletionAnd404s",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::<VIDEO_BUCKET_NAME>",
+      "Condition": { "StringLike": { "s3:prefix": ["videos/*"] } }
+    },
+    {
+      "Sid": "ReadAppSecrets",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": [
+        "<MONGODB_URI_SECRET_ARN>",
+        "<JWT_SECRET_SECRET_ARN>",
+        "<SMTP_PASS_SECRET_ARN>"
+      ]
+    }
+  ]
+}

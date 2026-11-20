@@ -1,0 +1,13 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowCloudFrontOriginAccessControl",
+      "Effect": "Allow",
+      "Principal": { "Service": "cloudfront.amazonaws.com" },
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::<FRONTEND_BUCKET_NAME>/*",
+      "Condition": { "StringEquals": { "AWS:SourceArn": "<CLOUDFRONT_DISTRIBUTION_ARN>" } }
+    }
+  ]
+}

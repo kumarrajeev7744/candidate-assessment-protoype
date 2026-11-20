@@ -221,6 +221,27 @@ describe('DELETE /api/candidates/:candidateId', () => {
     expect((await request(app).get('/api/invitations').set('Authorization', authHeader)).body.items).toHaveLength(1);
   });
 
+  it('keeps videos stored with the old key format playable and deletes them with the candidate', async () => {
+    const fx = await createCandidate();
+    // First implementation: videos/{candidateId}/{questionId}/{timestamp}-{random}.{ext}
+    const legacyKey = `videos/${fx.candidateId}/${questionIds[2]}/1690000000000-${'c'.repeat(24)}.webm`;
+    const legacyOrphan = `videos/${fx.candidateId}/${questionIds[3]}/1690000000001-${'d'.repeat(24)}.webm`;
+    s3.put(legacyKey);
+    s3.put(legacyOrphan);
+    await Response.updateOne({ _id: fx.responseIds[2] }, { $set: { 'video.objectKey': legacyKey } });
+
+    const report = await request(app).get(`/api/candidates/${fx.candidateId}/report`).set('Authorization', authHeader);
+    expect(report.status).toBe(200);
+    const q3 = report.body.questions.find((q: { questionNumber: number }) => q.questionNumber === 3);
+    expect(q3.response.video.available).toBe(true);
+    expect(q3.response.video.url).toEqual(expect.any(String));
+
+    const res = await removeCandidate(fx.candidateId);
+    expect(res.status).toBe(200);
+    expect(s3.objects.has(legacyKey)).toBe(false);
+    expect(s3.objects.has(legacyOrphan)).toBe(false);
+  });
+
   it('deletes candidates without any responses or videos', async () => {
     const fx = await createCandidate('In Progress', 0);
     const res = await removeCandidate(fx.candidateId);
