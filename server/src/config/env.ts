@@ -12,10 +12,10 @@ export interface AppConfig {
   jwtSecret: string | undefined;
   /** JWT lifetime in seconds (JWT_EXPIRES_IN accepts e.g. "1h", "30m", "3600"). */
   jwtExpiresInSeconds: number;
-  /** Number of proxy hops to trust for client IPs (App Runner sits behind a load balancer). */
+  /** Number of proxy hops to trust for client IPs (1 in production, behind the ALB). */
   trustProxy: number;
   loginRateLimit: { windowMs: number; max: number };
-  /** Public frontend URL used to build links in emails (first CLIENT_URL entry). */
+  /** Public frontend URL used to build links in emails (first FRONTEND_URL entry). */
   appBaseUrl: string;
   smtp: SmtpConfig;
   /** IANA time zone used to format dates in emails (e.g. Asia/Kolkata). */
@@ -78,6 +78,13 @@ function parseNonNegativeInt(value: string | undefined, fallback: number, name: 
   return n;
 }
 
+/** Removes one pair of matching surrounding quotes: '"A <a@x.com>"' -> 'A <a@x.com>'. */
+export function stripWrappingQuotes(value: string | undefined): string | undefined {
+  const v = value?.trim();
+  if (v && v.length >= 2 && (v[0] === '"' || v[0] === "'") && v.at(-1) === v[0]) return v.slice(1, -1).trim();
+  return v;
+}
+
 function parseTimeZone(value: string | undefined): string {
   const tz = value?.trim() || 'UTC';
   try {
@@ -88,8 +95,48 @@ function parseTimeZone(value: string | undefined): string {
   return tz;
 }
 
+/**
+ * Allowed frontend origin(s), comma-separated. FRONTEND_URL is the canonical name;
+ * CLIENT_URL is still accepted so existing local .env files keep working.
+ */
+export function frontendUrlFromEnv(env: NodeJS.ProcessEnv): string | undefined {
+  return env.FRONTEND_URL?.trim() || env.CLIENT_URL?.trim() || undefined;
+}
+
+/**
+ * Variables the API server cannot run without. Checked once at server startup (not by the seed
+ * scripts, which only need MONGODB_URI and the ADMIN_* values). Returns the names that are missing.
+ */
+export const REQUIRED_SERVER_ENV = [
+  'MONGODB_URI',
+  'JWT_SECRET',
+  'SMTP_USER',
+  'SMTP_PASS',
+  'S3_VIDEO_BUCKET',
+  'AWS_REGION',
+  'FRONTEND_URL',
+] as const;
+
+export function findMissingRequiredEnv(env: NodeJS.ProcessEnv = process.env): string[] {
+  return REQUIRED_SERVER_ENV.filter((name) =>
+    name === 'FRONTEND_URL' ? !frontendUrlFromEnv(env) : !env[name]?.trim(),
+  );
+}
+
+/** Throws one clear error listing every missing required variable (names only, never values). */
+export function assertRequiredEnv(env: NodeJS.ProcessEnv = process.env): void {
+  const missing = findMissingRequiredEnv(env);
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variable(s): ${missing.join(', ')}. ` +
+        'Set them in server/.env locally, or as ECS environment variables / Secrets Manager secrets in AWS (see server/.env.example).',
+    );
+  }
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
-  const clientUrls = (env.CLIENT_URL ?? 'http://localhost:5173')
+  const nodeEnv = parseNodeEnv(env.NODE_ENV);
+  const clientUrls = (frontendUrlFromEnv(env) ?? 'http://localhost:5173')
     .split(',')
     .map((url) => url.trim().replace(/\/+$/, ''))
     .filter(Boolean);
@@ -99,12 +146,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   return {
     port: parsePort(env.PORT),
-    nodeEnv: parseNodeEnv(env.NODE_ENV),
+    nodeEnv,
     clientUrls,
     mongodbUri: env.MONGODB_URI?.trim() || undefined,
     jwtSecret: env.JWT_SECRET || undefined,
     jwtExpiresInSeconds: parseDurationSeconds(env.JWT_EXPIRES_IN, 3600, 'JWT_EXPIRES_IN'),
-    trustProxy: parseNonNegativeInt(env.TRUST_PROXY, 0, 'TRUST_PROXY'),
+    // Production runs behind a load balancer (ALB): trust exactly one proxy hop unless overridden.
+    trustProxy: parseNonNegativeInt(env.TRUST_PROXY, nodeEnv === 'production' ? 1 : 0, 'TRUST_PROXY'),
     loginRateLimit: {
       windowMs: 15 * 60 * 1000,
       max: parseNonNegativeInt(env.LOGIN_RATE_LIMIT_MAX, 10, 'LOGIN_RATE_LIMIT_MAX') || 10,
@@ -118,7 +166,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       user: env.SMTP_USER?.trim() || undefined,
       // Gmail shows App Passwords with spaces ("abcd efgh ijkl mnop"); spaces are not part of it.
       pass: env.SMTP_PASS?.replace(/\s+/g, '') || undefined,
-      from: env.SMTP_FROM?.trim() || undefined,
+      // `docker run --env-file` keeps quotes literally (dotenv strips them): accept both forms.
+      from: stripWrappingQuotes(env.SMTP_FROM) || undefined,
     },
     emailTimeZone: parseTimeZone(env.EMAIL_TIMEZONE),
     video: {

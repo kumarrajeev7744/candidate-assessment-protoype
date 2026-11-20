@@ -1,0 +1,30 @@
+# Only the root manifests and server/ are needed (see server/Dockerfile).
+**/node_modules
+**/dist
+**/coverage
+client
+docs
+.git
+.github
+.gitignore
+.vscode
+.idea
+
+# Environment files and secrets: configuration comes from ECS at runtime.
+**/.env
+**/.env.*
+
+# Logs and test artefacts
+**/*.log
+**/npm-debug.log*
+server/tests
+server/vitest.config.ts
+**/*.test.ts
+**/test-results
+**/playwright-report
+**/.vitest
+
+# Not needed for the build
+README.md
+eslint.config.mjs
+**/.DS_Store

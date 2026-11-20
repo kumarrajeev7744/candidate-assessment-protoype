@@ -11,7 +11,7 @@ export default defineConfig({
     env: {
       JWT_SECRET: 'test-only-jwt-secret-0123456789abcdefghijklmnop',
       JWT_EXPIRES_IN: '1h',
-      CLIENT_URL: 'http://localhost:5173',
+      FRONTEND_URL: 'http://localhost:5173',
       SMTP_HOST: 'smtp.test.invalid',
       SMTP_USER: 'sender@example.com',
       SMTP_PASS: 'test-app-password',

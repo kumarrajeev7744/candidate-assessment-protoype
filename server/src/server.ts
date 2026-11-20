@@ -1,6 +1,6 @@
 import type { Server } from 'node:http';
 import { createApp } from './app.js';
-import { config } from './config/env.js';
+import { assertRequiredEnv, config } from './config/env.js';
 import { checkProductionConfig } from './config/productionChecks.js';
 import { connectDatabase, disconnectDatabase } from './config/database.js';
 import { logger } from './utils/logger.js';
@@ -12,22 +12,29 @@ export const SERVER_TIMEOUTS = {
   headersTimeoutMs: 66_000,
   keepAliveTimeoutMs: 65_000,
 } as const;
-/** App Runner waits a limited time after SIGTERM; finish in-flight requests, then exit regardless. */
+/** ECS sends SIGTERM, then SIGKILL after the stop timeout (30 s by default): finish in-flight requests, then exit regardless. */
 const SHUTDOWN_GRACE_MS = 10_000;
 
 let server: Server | undefined;
 let shuttingDown = false;
 
+/** Bind on all IPv4 interfaces so the container port is reachable from the load balancer. */
+const HOST = '0.0.0.0';
+
 async function start(): Promise<void> {
-  getJwtSecret(); // fail fast if JWT_SECRET is missing or weak
+  assertRequiredEnv(); // fail fast, naming every missing variable
+  if (!process.env.FRONTEND_URL && process.env.CLIENT_URL) {
+    logger.warn('CLIENT_URL is deprecated; rename it to FRONTEND_URL');
+  }
+  getJwtSecret(); // fail fast if JWT_SECRET is weak or a placeholder
   const { errors, warnings } = checkProductionConfig(config);
   for (const warning of warnings) logger.warn('Configuration warning', { warning });
   if (errors.length > 0) throw new Error(`Invalid production configuration: ${errors.join(' ')}`);
 
   await connectDatabase(config.mongodbUri);
   const app = createApp();
-  server = app.listen(config.port, () => {
-    logger.info(`API listening on port ${config.port}`, { env: config.nodeEnv });
+  server = app.listen(config.port, HOST, () => {
+    logger.info(`API listening on ${HOST}:${config.port}`, { env: config.nodeEnv, trustProxy: config.trustProxy });
   });
   server.requestTimeout = SERVER_TIMEOUTS.requestTimeoutMs;
   server.headersTimeout = SERVER_TIMEOUTS.headersTimeoutMs;
