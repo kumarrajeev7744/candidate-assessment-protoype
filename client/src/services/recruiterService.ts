@@ -1,5 +1,5 @@
 import { apiRequest } from './apiClient';
-import type { CandidateListResponse, InvitationActionResult } from '../types/recruiter';
+import type { CandidateListResponse, InvitationActionResult, Rejection } from '../types/recruiter';
 
 /** Recruiter APIs. All calls send the admin JWT; a 401 ends the session (see AuthContext). */
 export function listCandidates(params: { search?: string; page?: number; limit?: number }): Promise<CandidateListResponse> {
@@ -27,4 +27,12 @@ export function resendConfirmationEmail(invitationId: string): Promise<Invitatio
     method: 'POST',
     auth: true,
   });
+}
+
+export function rejectCandidate(candidateId: string, reason: string): Promise<{ candidateId: string; rejection: Rejection }> {
+  return apiRequest(`/candidates/${encodeURIComponent(candidateId)}/reject`, { method: 'POST', body: { reason }, auth: true });
+}
+
+export function undoRejection(candidateId: string): Promise<{ candidateId: string; rejection: null }> {
+  return apiRequest(`/candidates/${encodeURIComponent(candidateId)}/rejection`, { method: 'DELETE', auth: true });
 }

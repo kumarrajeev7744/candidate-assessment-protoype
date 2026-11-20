@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { dashboardSettings } from '../src/pages/DashboardPage';
@@ -23,6 +23,7 @@ function item(overrides: Partial<CandidateListItem> & { name: string; email: str
     confirmationEmailSentAt: null,
     canResendInvitation: true,
     canResendConfirmation: false,
+    rejection: null,
     ...rest,
   };
 }
@@ -57,6 +58,7 @@ interface Backend {
   resendResult?: { status: number; body: unknown };
   confirmationResult?: { status: number; body: unknown };
   deleteResult?: { status: number; body: unknown };
+  rejectResult?: { status: number; body: unknown };
 }
 
 /** Fake recruiter API: auth endpoints + candidate list (with search) + actions. */
@@ -105,6 +107,24 @@ function installBackend(backend: Backend) {
     if (method === 'POST' && /^\/invitations\/[^/]+\/resend$/.test(path)) {
       const result = backend.resendResult ?? { status: 200, body: { candidate: {}, invitation: {}, email: { sent: true } } };
       return json(result.status, result.body);
+    }
+    const rej = /^\/candidates\/([^/]+)\/reject$/.exec(path);
+    if (method === 'POST' && rej) {
+      const result = backend.rejectResult ?? {
+        status: 200,
+        body: { candidateId: rej[1], rejection: { reason: body.reason, rejectedAt: new Date().toISOString(), rejectedBy: 'recruiter@example.com' } },
+      };
+      if (result.status === 200) {
+        backend.rows = backend.rows.map((r) =>
+          r.candidate.id === rej[1] ? { ...r, canResendInvitation: false, rejection: (result.body as { rejection: CandidateListItem['rejection'] }).rejection } : r,
+        );
+      }
+      return json(result.status, result.body);
+    }
+    const unrej = /^\/candidates\/([^/]+)\/rejection$/.exec(path);
+    if (method === 'DELETE' && unrej) {
+      backend.rows = backend.rows.map((r) => (r.candidate.id === unrej[1] ? { ...r, rejection: null, canResendInvitation: r.status !== 'Completed' } : r));
+      return json(200, { candidateId: unrej[1], rejection: null });
     }
     const del = /^\/candidates\/([^/]+)$/.exec(path);
     if (method === 'DELETE' && del) {
@@ -205,17 +225,17 @@ describe('Recruiter dashboard', () => {
       return labels;
     };
 
-    expect(await menuItems('Neha Completed')).toEqual(['View report', 'Resend confirmation email', 'Delete candidate']);
-    expect(await menuItems('Done Sent')).toEqual(['View report', 'Delete candidate']);
-    expect(await menuItems('Arjun Progress')).toEqual(['Resend invitation', 'Delete candidate']); // no report until completed
-    expect(await menuItems('Priya Expired')).toEqual(['Resend invitation', 'Delete candidate']);
+    expect(await menuItems('Neha Completed')).toEqual(['View report', 'Resend confirmation email', 'Reject candidate', 'Delete candidate']);
+    expect(await menuItems('Done Sent')).toEqual(['View report', 'Reject candidate', 'Delete candidate']);
+    expect(await menuItems('Arjun Progress')).toEqual(['Resend invitation', 'Reject candidate', 'Delete candidate']); // no report until completed
+    expect(await menuItems('Priya Expired')).toEqual(['Resend invitation', 'Reject candidate', 'Delete candidate']);
 
-    // No separate buttons or links outside the menu.
+    // One ⋯ button per row; only completed candidates' names link to their report.
     for (const name of ['Neha Completed', 'Arjun Progress', 'Priya Expired', 'Done Sent']) {
-      const row = rowFor(name);
-      expect(within(row).queryByRole('link')).not.toBeInTheDocument();
-      expect(within(row).getAllByRole('button')).toHaveLength(1);
+      expect(within(rowFor(name)).getAllByRole('button')).toHaveLength(1);
     }
+    expect(within(rowFor('Neha Completed')).getByRole('link', { name: 'Neha Completed' })).toHaveAttribute('href', '/admin/candidates/cand-inv3');
+    expect(within(rowFor('Arjun Progress')).queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('shows an empty state when there are no candidates', async () => {
@@ -433,7 +453,7 @@ describe('Resend actions', () => {
       await userEvent.click(screen.getByRole('button', { name: 'More actions for Neha Completed' }));
       const labels = within(screen.getByRole('menu')).getAllByRole('menuitem').map((m) => m.textContent);
       await userEvent.keyboard('{Escape}');
-      expect(labels).toEqual(['View report', 'Delete candidate']);
+      expect(labels).toEqual(['View report', 'Reject candidate', 'Delete candidate']);
     });
   });
 
@@ -535,5 +555,85 @@ describe('Delete candidate', () => {
     api.backend.deleteResult = undefined;
     await userEvent.click(within(dialog).getByRole('button', { name: 'Delete permanently' }));
     expect(await screen.findByText('Neha Completed and all of their data were permanently deleted.')).toBeInTheDocument();
+  });
+});
+
+describe('Clicking a completed candidate row', () => {
+  it('opens the report for completed candidates only', async () => {
+    const api = await openDashboard({ rows: ROWS });
+    await screen.findByRole('table');
+    await userEvent.click(within(rowFor('Arjun Progress')).getAllByRole('cell')[1]!); // not completed: nothing happens
+    expect(screen.getByRole('heading', { name: 'Candidates' })).toBeInTheDocument();
+
+    await userEvent.click(within(rowFor('Neha Completed')).getAllByRole('cell')[2]!); // any cell of a completed row
+    expect(await screen.findByRole('heading', { name: 'Candidate not found' })).toBeInTheDocument();
+    expect(api.calls.some((c) => c.path === '/candidates/cand-inv3/report')).toBe(true);
+  });
+
+  it('does not navigate when the ⋯ menu is used', async () => {
+    await openDashboard({ rows: ROWS });
+    await screen.findByRole('table');
+    await userEvent.click(within(rowFor('Neha Completed')).getByRole('button', { name: 'More actions for Neha Completed' }));
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Candidates' })).toBeInTheDocument();
+  });
+});
+
+describe('Reject candidate', () => {
+  async function openReject(name = 'Arjun Progress', backend: Partial<Backend> = {}) {
+    const api = await openDashboard({ rows: ROWS, ...backend });
+    await screen.findByRole('table');
+    await chooseAction(name, `Reject candidate ${name}`);
+    const dialog = await screen.findByRole('dialog', { name: `Reject ${name}?` });
+    return { api, dialog };
+  }
+
+  it('requires a reason, limits it to 500 characters and shows a counter', async () => {
+    const { api, dialog } = await openReject();
+    expect(dialog).toHaveTextContent('assessment link will stop working');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Reject candidate' }));
+    expect(within(dialog).getByText('Please enter a reason for the rejection.')).toBeInTheDocument();
+    expect(api.calls.some((c) => c.path.endsWith('/reject'))).toBe(false);
+
+    const box = within(dialog).getByLabelText('Reason for rejection');
+    expect(within(dialog).getByText('0/500')).toBeInTheDocument();
+    await userEvent.type(box, 'a');
+    expect(within(dialog).queryByText('Please enter a reason for the rejection.')).not.toBeInTheDocument();
+    fireEvent.change(box, { target: { value: 'x'.repeat(520) } });
+    expect((box as HTMLTextAreaElement).value).toHaveLength(500);
+    expect(within(dialog).getByText('500/500')).toBeInTheDocument();
+  });
+
+  it('rejects with the reason, shows the Rejected badge and offers Undo', async () => {
+    const { api, dialog } = await openReject();
+    await userEvent.type(within(dialog).getByLabelText('Reason for rejection'), 'Limited enterprise experience.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Reject candidate' }));
+    expect(await screen.findByText('Arjun Progress was rejected.')).toBeInTheDocument();
+    const call = api.calls.find((c) => c.path.endsWith('/reject'))!;
+    expect(call.path).toBe('/candidates/cand-inv2/reject');
+    expect(call.body).toEqual({ reason: 'Limited enterprise experience.' });
+
+    await waitFor(() => expect(within(rowFor('Arjun Progress')).getByText('Rejected')).toBeInTheDocument());
+    await userEvent.click(within(rowFor('Arjun Progress')).getByRole('button', { name: 'More actions for Arjun Progress' }));
+    const labels = within(screen.getByRole('menu')).getAllByRole('menuitem').map((m) => m.textContent);
+    expect(labels).toEqual(['Undo rejection', 'Delete candidate']); // no resend for rejected candidates
+    await userEvent.keyboard('{Escape}');
+
+    await chooseAction('Arjun Progress', 'Undo rejection of Arjun Progress');
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Undo rejection?' })).getByRole('button', { name: 'Undo rejection' }));
+    expect(await screen.findByText('The rejection of Arjun Progress was undone.')).toBeInTheDocument();
+    await waitFor(() => expect(within(rowFor('Arjun Progress')).queryByText('Rejected')).not.toBeInTheDocument());
+  });
+
+  it('shows API errors in the dialog and can be cancelled', async () => {
+    const { dialog } = await openReject('Neha Completed', {
+      rejectResult: { status: 409, body: { error: { code: 'ALREADY_REJECTED', message: 'This candidate has already been rejected.' } } },
+    });
+    expect(dialog).not.toHaveTextContent('assessment link will stop working'); // already submitted
+    await userEvent.type(within(dialog).getByLabelText('Reason for rejection'), 'Reason');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Reject candidate' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('This candidate has already been rejected.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { Invitation } from '../models/index.js';
+import { Candidate, Invitation } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 import { isExpired } from '../utils/dates.js';
 import { hashToken, isWellFormedToken } from '../utils/token.js';
@@ -30,6 +30,9 @@ export async function requireCandidate(req: Request, _res: Response, next: NextF
   }
   if (invitation.status === 'Completed') {
     throw new AppError(409, 'This assessment has already been submitted. Thank you!', 'ASSESSMENT_COMPLETED');
+  }
+  if (await Candidate.exists({ _id: invitation.candidateId, rejection: { $exists: true } })) {
+    throw new AppError(403, 'This assessment is no longer available.', 'ASSESSMENT_CLOSED');
   }
   if (isExpired(invitation.expiresAt)) {
     throw new AppError(

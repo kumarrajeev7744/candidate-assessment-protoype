@@ -6,6 +6,7 @@ const ICON: Record<FatalKind, { name: IconName; tone: string }> = {
   expired: { name: 'clock', tone: 'status-icon-warning' },
   completed: { name: 'checkCircle', tone: 'status-icon-success' },
   unavailable: { name: 'alert', tone: 'status-icon-warning' },
+  closed: { name: 'lock', tone: 'status-icon-brand' },
 };
 
 const CONTENT: Record<FatalKind, { title: string; body: string }> = {
@@ -20,6 +21,10 @@ const CONTENT: Record<FatalKind, { title: string; body: string }> = {
   completed: {
     title: 'Assessment already submitted',
     body: 'You have already completed this assessment. Thank you!',
+  },
+  closed: {
+    title: 'Assessment no longer available',
+    body: 'This assessment is no longer available. If you have any questions, please contact the recruiter.',
   },
   unavailable: {
     title: 'Assessment unavailable',

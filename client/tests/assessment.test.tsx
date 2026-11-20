@@ -261,6 +261,7 @@ describe('Resume', () => {
 
 describe('Invalid links', () => {
   it.each([
+    [403, 'ASSESSMENT_CLOSED', 'Assessment no longer available', /please contact the recruiter/],
     [401, 'INVALID_ASSESSMENT_TOKEN', 'Invitation not found', /link is invalid/],
     [410, 'INVITATION_EXPIRED', 'Invitation expired', /request a new link/],
     [409, 'ASSESSMENT_COMPLETED', 'Assessment already submitted', /already completed/],

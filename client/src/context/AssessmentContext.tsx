@@ -30,7 +30,7 @@ export const assessmentSettings = { autosaveDelayMs: 1000 };
 
 export type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'error';
 
-export type FatalKind = 'invalid' | 'expired' | 'completed' | 'unavailable';
+export type FatalKind = 'invalid' | 'expired' | 'completed' | 'unavailable' | 'closed';
 
 export type LoadState =
   | { kind: 'loading' }
@@ -73,6 +73,7 @@ const AssessmentContext = createContext<AssessmentContextValue | null>(null);
 function fatalFromError(err: unknown): LoadState | null {
   if (!(err instanceof ApiError)) return null;
   if (err.status === 401) return { kind: 'fatal', reason: 'invalid', message: err.message };
+  if (err.status === 403 && err.code === 'ASSESSMENT_CLOSED') return { kind: 'fatal', reason: 'closed', message: err.message };
   if (err.status === 410) return { kind: 'fatal', reason: 'expired', message: err.message };
   if (err.status === 409 && err.code === 'ASSESSMENT_COMPLETED') {
     return { kind: 'fatal', reason: 'completed', message: err.message };

@@ -1,12 +1,38 @@
 import { Schema, model, type HydratedDocument } from 'mongoose';
 import { EMAIL_REGEX, MAX_EMAIL_LENGTH } from '../utils/validation.js';
 
+export const REJECTION_REASON_MAX_LENGTH = 500;
+
+/** Recruiter decision to reject the candidate (separate from the assessment status). */
+export interface ICandidateRejection {
+  reason: string;
+  rejectedAt: Date;
+  /** Email of the recruiter who rejected the candidate. */
+  rejectedBy: string;
+}
+
 export interface ICandidate {
   name: string;
   email: string;
+  rejection?: ICandidateRejection;
   createdAt: Date;
   updatedAt: Date;
 }
+
+const rejectionSchema = new Schema<ICandidateRejection>(
+  {
+    reason: {
+      type: String,
+      required: [true, 'Rejection reason is required'],
+      trim: true,
+      minlength: [1, 'Rejection reason is required'],
+      maxlength: [REJECTION_REASON_MAX_LENGTH, `Rejection reason cannot exceed ${REJECTION_REASON_MAX_LENGTH} characters`],
+    },
+    rejectedAt: { type: Date, required: true },
+    rejectedBy: { type: String, required: true, trim: true, maxlength: MAX_EMAIL_LENGTH },
+  },
+  { _id: false },
+);
 
 const candidateSchema = new Schema<ICandidate>(
   {
@@ -27,6 +53,7 @@ const candidateSchema = new Schema<ICandidate>(
       maxlength: MAX_EMAIL_LENGTH,
       match: [EMAIL_REGEX, 'Email is invalid'],
     },
+    rejection: { type: rejectionSchema, required: false },
   },
   { timestamps: true },
 );

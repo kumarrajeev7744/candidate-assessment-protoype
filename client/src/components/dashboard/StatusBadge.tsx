@@ -10,7 +10,8 @@ export function StatusBadge({ item }: { item: CandidateListItem }) {
   return (
     <div className="status-cell">
       <span className={CLASS[item.status]}>{item.status}</span>
-      {item.isExpired && <span className="badge badge-danger">Expired</span>}
+      {item.rejection && <span className="badge badge-danger">Rejected</span>}
+      {item.isExpired && !item.rejection && <span className="badge badge-danger">Expired</span>}
       {item.status !== 'Completed' && item.emailStatus === 'Failed' && (
         <span className="status-note">Invitation email failed</span>
       )}

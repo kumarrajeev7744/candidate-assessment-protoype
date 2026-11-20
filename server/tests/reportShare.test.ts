@@ -124,7 +124,7 @@ describe('GET /api/candidates/:candidateId/report', () => {
     const res = await report(fx.candidateId);
     expect(res.status).toBe(200);
     expect(res.headers['cache-control']).toBe('no-store');
-    expect(res.body.candidate).toEqual({ id: fx.candidateId, name: 'Priya Sharma', email: expect.stringMatching(/@example\.com$/) });
+    expect(res.body.candidate).toEqual({ id: fx.candidateId, name: 'Priya Sharma', email: expect.stringMatching(/@example\.com$/), rejection: null });
     expect(res.body.assessment).toEqual({
       status: 'Completed',
       invitedAt: expect.any(String),

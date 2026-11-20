@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useState, type MouseEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '../services/apiClient';
-import { listCandidates, resendConfirmationEmail, resendInvitation } from '../services/recruiterService';
+import { listCandidates, resendConfirmationEmail, resendInvitation, undoRejection } from '../services/recruiterService';
+import { RejectCandidateDialog } from '../components/dashboard/RejectCandidateDialog';
 import { deleteCandidate } from '../services/reportService';
 import type { CandidateListItem, CandidateListResponse, InvitationActionResult } from '../types/recruiter';
 import { formatShortDateTime } from '../utils/format';
@@ -35,6 +36,8 @@ export function DashboardPage() {
   const [resendTarget, setResendTarget] = useState<CandidateListItem | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CandidateListItem | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<CandidateListItem | null>(null);
+  const [undoTarget, setUndoTarget] = useState<CandidateListItem | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Load the list whenever the search, page or reload counter changes.
@@ -173,6 +176,22 @@ export function DashboardPage() {
         onSelect: () => void handleResendConfirmation(item),
       });
     }
+    if (item.rejection) {
+      actions.push({
+        label: 'Undo rejection',
+        ariaLabel: `Undo rejection of ${item.candidate.name}`,
+        icon: 'refresh',
+        onSelect: () => setUndoTarget(item),
+      });
+    } else {
+      actions.push({
+        label: 'Reject candidate',
+        ariaLabel: `Reject candidate ${item.candidate.name}`,
+        icon: 'alert',
+        danger: true,
+        onSelect: () => setRejectTarget(item),
+      });
+    }
     actions.push({
       label: 'Delete candidate',
       ariaLabel: `Delete candidate ${item.candidate.name}`,
@@ -203,6 +222,31 @@ export function DashboardPage() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  async function confirmUndoRejection() {
+    const item = undoTarget;
+    if (!item) return;
+    setBusyId(item.id);
+    try {
+      await undoRejection(item.candidate.id);
+      setFeedback({ kind: 'success', text: `The rejection of ${item.candidate.name} was undone.` });
+      refresh();
+    } catch (err) {
+      if (!(err instanceof ApiError && err.status === 401)) {
+        setFeedback({ kind: 'error', text: `Could not undo the rejection. ${errorText(err, '')}`.trim() });
+      }
+    } finally {
+      setBusyId(null);
+      setUndoTarget(null);
+    }
+  }
+
+  /** Completed candidates' rows open their report (the ⋯ menu and links keep their own behaviour). */
+  function onRowClick(event: MouseEvent<HTMLTableRowElement>, item: CandidateListItem) {
+    if (item.status !== 'Completed') return;
+    if ((event.target as HTMLElement).closest('button, a, [role="menu"]')) return;
+    navigate(`/admin/candidates/${item.candidate.id}`);
   }
 
   const items = data?.items ?? [];
@@ -312,9 +356,19 @@ export function DashboardPage() {
             </thead>
             <tbody>
               {items.map((item) => (
-                <tr key={item.id}>
+                <tr
+                  key={item.id}
+                  className={item.status === 'Completed' ? 'is-clickable' : undefined}
+                  onClick={(e) => onRowClick(e, item)}
+                >
                   <td data-label="Candidate name" className="cell-name">
-                    {item.candidate.name}
+                    {item.status === 'Completed' ? (
+                      <Link to={`/admin/candidates/${item.candidate.id}`} className="row-link">
+                        {item.candidate.name}
+                      </Link>
+                    ) : (
+                      item.candidate.name
+                    )}
                   </td>
                   <td data-label="Email" className="cell-email">
                     {item.candidate.email}
@@ -377,6 +431,36 @@ export function DashboardPage() {
       )}
 
       {creating && <CreateCandidateDialog onCreated={handleCreated} onClose={() => setCreating(false)} />}
+
+      {rejectTarget && (
+        <RejectCandidateDialog
+          candidateId={rejectTarget.candidate.id}
+          candidateName={rejectTarget.candidate.name}
+          candidateCompleted={rejectTarget.status === 'Completed'}
+          onRejected={() => {
+            setFeedback({ kind: 'success', text: `${rejectTarget.candidate.name} was rejected.` });
+            setRejectTarget(null);
+            refresh();
+          }}
+          onClose={() => setRejectTarget(null)}
+        />
+      )}
+
+      {undoTarget && (
+        <ConfirmDialog
+          title="Undo rejection?"
+          confirmLabel="Undo rejection"
+          busyLabel="Undoing…"
+          busy={busyId === undoTarget.id}
+          onConfirm={() => void confirmUndoRejection()}
+          onCancel={() => setUndoTarget(null)}
+        >
+          <p>
+            {undoTarget.candidate.name} will no longer be marked as rejected
+            {undoTarget.status !== 'Completed' && ' and their assessment link will work again'}. The recorded reason is removed.
+          </p>
+        </ConfirmDialog>
+      )}
 
       {deleteTarget && (
         <ConfirmDialog

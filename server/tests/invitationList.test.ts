@@ -90,6 +90,7 @@ describe('GET /api/invitations', () => {
       confirmationEmailSentAt: null,
       canResendInvitation: false,
       canResendConfirmation: true,
+      rejection: null,
     });
     expect(second).toMatchObject({ id: mid.invitation.id, status: 'In Progress', completedAt: null, canResendInvitation: true, canResendConfirmation: false });
     expect(third).toMatchObject({ id: old.invitation.id, status: 'Invited', isExpired: true, canResendInvitation: true, confirmationEmailStatus: null });

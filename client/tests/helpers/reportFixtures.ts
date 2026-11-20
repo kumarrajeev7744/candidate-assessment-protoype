@@ -33,7 +33,7 @@ export function question(n: number, overrides: Partial<ReportQuestion> = {}): Re
 
 export function makeReport(overrides: Partial<CandidateReport> = {}): CandidateReport {
   return {
-    candidate: { id: CANDIDATE_ID, name: 'Priya Sharma', email: 'priya@example.com' },
+    candidate: { id: CANDIDATE_ID, name: 'Priya Sharma', email: 'priya@example.com', rejection: null },
     assessment: {
       status: 'Completed',
       invitedAt: '2026-11-15T10:00:00Z',
