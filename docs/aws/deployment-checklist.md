@@ -57,7 +57,7 @@ Create three secrets of type "Other type of secret" → **Plaintext** (one value
 
 - [ ] Connect GitHub and choose the repository and branch; source directory `/`; runtime Node.js 22.
 - [ ] Build / start commands, port 8080, health check `/api/health`, instance role, env vars and secrets exactly as in [app-runner.md](app-runner.md).
-- [ ] `CLIENT_URL=https://<CLOUDFRONT_DOMAIN>`, `TRUST_PROXY=1`, `NODE_ENV=production`.
+- [ ] `FRONTEND_URL=https://<CLOUDFRONT_DOMAIN>`, `TRUST_PROXY=1`, `NODE_ENV=production`.
 - [ ] Deploy. Logs must show `MongoDB connected` and `API listening on port 8080`, and no `Configuration warning` lines.
 - [ ] `curl https://<APP_RUNNER_SERVICE_DOMAIN>/api/health` → 200; `…/api/health/ready` → `"database":"connected"`.
 

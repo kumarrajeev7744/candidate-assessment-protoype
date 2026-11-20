@@ -7,7 +7,7 @@ import { redactPath } from '../src/middleware/requestLogger.js';
 
 const prodEnv = {
   NODE_ENV: 'production',
-  CLIENT_URL: 'https://app.example.com',
+  FRONTEND_URL: 'https://app.example.com',
   MONGODB_URI: 'mongodb+srv://user:pass@cluster.example.net/candidate_assessment',
   TRUST_PROXY: '1',
   SMTP_USER: 'sender@example.com',
@@ -28,15 +28,15 @@ describe('checkProductionConfig', () => {
   });
 
   it('skips all checks outside production', () => {
-    expect(check({ NODE_ENV: 'development', CLIENT_URL: undefined, TRUST_PROXY: '0' })).toEqual({ errors: [], warnings: [] });
+    expect(check({ NODE_ENV: 'development', FRONTEND_URL: undefined, TRUST_PROXY: '0' })).toEqual({ errors: [], warnings: [] });
   });
 
-  it('requires an explicit https, non-localhost, origin-only CLIENT_URL', () => {
-    expect(check({ CLIENT_URL: undefined }).errors).toHaveLength(1);
-    expect(check({ CLIENT_URL: 'http://app.example.com' }).errors[0]).toMatch(/https/);
-    expect(check({ CLIENT_URL: 'https://localhost:5173' }).errors[0]).toMatch(/localhost/);
-    expect(check({ CLIENT_URL: 'https://app.example.com/admin' }).errors[0]).toMatch(/origins only/);
-    expect(check({ CLIENT_URL: 'https://a.example.com,https://b.example.com/' }).errors).toEqual([]);
+  it('requires an explicit https, non-localhost, origin-only FRONTEND_URL', () => {
+    expect(check({ FRONTEND_URL: undefined }).errors).toHaveLength(1);
+    expect(check({ FRONTEND_URL: 'http://app.example.com' }).errors[0]).toMatch(/https/);
+    expect(check({ FRONTEND_URL: 'https://localhost:5173' }).errors[0]).toMatch(/localhost/);
+    expect(check({ FRONTEND_URL: 'https://app.example.com/admin' }).errors[0]).toMatch(/origins only/);
+    expect(check({ FRONTEND_URL: 'https://a.example.com,https://b.example.com/' }).errors).toEqual([]);
   });
 
   it('requires MONGODB_URI', () => {
@@ -46,16 +46,15 @@ describe('checkProductionConfig', () => {
   it('warns about settings that break App Runner deployments, without echoing secret values', () => {
     const { errors, warnings } = check({
       TRUST_PROXY: '0',
-      SMTP_PASS: undefined,
-      S3_VIDEO_BUCKET: undefined,
+      SMTP_FROM: undefined,
       AWS_ACCESS_KEY_ID: 'AKIAEXAMPLEKEY',
       ADMIN_PASSWORD: 'super-secret-password',
       S3_ENDPOINT: 'http://localhost:9000',
     });
     expect(errors).toEqual([]);
-    expect(warnings).toHaveLength(6);
+    expect(warnings).toHaveLength(5);
     const text = warnings.join(' ');
-    expect(text).toMatch(/TRUST_PROXY=1/);
+    expect(text).toMatch(/TRUST_PROXY/);
     expect(text).not.toContain('AKIAEXAMPLEKEY');
     expect(text).not.toContain('super-secret-password');
   });

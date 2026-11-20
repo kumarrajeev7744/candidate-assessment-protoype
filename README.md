@@ -30,13 +30,13 @@ cp server/.env.example server/.env
 | client | `VITE_API_BASE_URL` | Base URL of the backend API (build time). **Required** for production builds | `http://localhost:4000/api` (dev server only) |
 | server | `PORT` | Port the API listens on | `4000` |
 | server | `NODE_ENV` | `development`, `test` or `production` | `development` |
-| server | `CLIENT_URL` | Allowed CORS origin(s), comma-separated. In production: required, `https://`, origin only | `http://localhost:5173` |
+| server | `FRONTEND_URL` | **Required.** Allowed CORS origin(s), comma-separated. In production: `https://`, origin only. (`CLIENT_URL` is accepted as the old name) | – |
 | server | `MONGODB_URI` | MongoDB Atlas connection string (**required** to start the API) | – |
 | server | `JWT_SECRET` | Random secret, ≥ 32 characters (**required** to start the API) | – |
 | server | `JWT_EXPIRES_IN` | Admin token lifetime (`3600`, `30m`, `1h`, …) | `1h` |
 | server | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Admin account created by `seed:admin` (password ≥ 12 chars) | – |
 | server | `LOGIN_RATE_LIMIT_MAX` | Failed logins allowed per IP per 15 minutes | `10` |
-| server | `TRUST_PROXY` | Proxy hops to trust for client IPs (`1` on App Runner) | `0` |
+| server | `TRUST_PROXY` | Proxy hops to trust for client IPs | `1` in production (ALB), else `0` |
 | server | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | SMTP server | `smtp.gmail.com` / `587` / `false` |
 | server | `SMTP_USER` / `SMTP_PASS` | Gmail address and Google App Password | – (email disabled) |
 | server | `SMTP_FROM` | Sender shown to recipients | `"Candidate Assessment" <SMTP_USER>` |
@@ -48,7 +48,7 @@ cp server/.env.example server/.env
 | server | `COMPANY_NAME` | Optional employer name used in the submission confirmation email | – (omitted) |
 | server | `S3_ENDPOINT` | Optional S3-compatible endpoint for local testing (MinIO, LocalStack). Leave unset for AWS | – |
 
-`CLIENT_URL` (first entry) is also used to build links in emails, e.g. `{CLIENT_URL}/assessment/{token}`.
+`FRONTEND_URL` (first entry) is also used to build links in emails, e.g. `{FRONTEND_URL}/assessment/{token}`.
 
 Secrets are only ever server-side; nothing secret goes into `VITE_*` variables (those are bundled into the public frontend).
 
@@ -162,7 +162,7 @@ The API starts without SMTP credentials; email operations then report `Email ser
 | `POST /api/invitations/:id/resend` | Bearer JWT | New token + email; old link stops working; expiry reset to 7 days. 400 bad ID, 404 not found, 409 already completed, 503 email not configured |
 | `GET /api/invitations/validate/:token` | Public | 200 `{ valid, status, expiresAt }`, 404 invalid, 410 expired, 409 completed. Read-only (never changes status) |
 
-Candidates open `{CLIENT_URL}/assessment/{token}`.
+Candidates open `{FRONTEND_URL}/assessment/{token}`.
 
 ## Candidate assessment
 
@@ -276,7 +276,31 @@ Production frontend build (fails if `VITE_API_BASE_URL` is missing):
 VITE_API_BASE_URL=https://<APP_RUNNER_SERVICE_DOMAIN>/api npm run build:client
 ```
 
-With `NODE_ENV=production` the API refuses to start without an `https://` `CLIENT_URL`, a `MONGODB_URI` and a strong `JWT_SECRET`, and logs warnings for risky settings (for example `TRUST_PROXY=0` or AWS access keys in the environment). It also sends security headers (HSTS, `nosniff`, `X-Frame-Options`, `no-referrer`, a restrictive CSP), logs one JSON line per request with tokens redacted, and shuts down gracefully on `SIGTERM`.
+With `NODE_ENV=production` the API refuses to start without an `https://` `FRONTEND_URL`, a `MONGODB_URI` and a strong `JWT_SECRET`, and logs warnings for risky settings (for example `TRUST_PROXY=0` or AWS access keys in the environment). It also sends security headers (HSTS, `nosniff`, `X-Frame-Options`, `no-referrer`, a restrictive CSP), logs one JSON line per request with tokens redacted, and shuts down gracefully on `SIGTERM`.
+
+## Docker image (backend, for AWS ECS Fargate)
+
+`server/Dockerfile` builds the API (multi-stage, Node 22 slim, production dependencies only, runs as the non-root `node` user, no `.env` or `client/` inside). Build from the **repository root**:
+
+```bash
+docker build --platform linux/amd64 -f server/Dockerfile -t candidate-assessment-backend:local .
+```
+
+```bash
+docker run --rm -p 4000:4000 --env-file server/.env candidate-assessment-backend:local
+```
+
+```bash
+curl -i http://localhost:4000/api/health
+```
+
+The server fails fast at startup, naming every missing required variable (`MONGODB_URI`, `JWT_SECRET`, `SMTP_USER`, `SMTP_PASS`, `S3_VIDEO_BUCKET`, `AWS_REGION`, `FRONTEND_URL`). Seed scripts run in the same image:
+
+```bash
+docker run --rm --env-file server/.env candidate-assessment-backend:local npm run seed:questions:prod
+```
+
+When MongoDB runs on your Mac, `localhost` inside the container is the container itself; use `host.docker.internal` in `MONGODB_URI` instead. Atlas URIs work unchanged.
 
 ## Code quality
 

@@ -36,7 +36,7 @@ Production target for the Candidate Assessment Platform. Nothing here has been c
 
 | Setting | Value |
 |---|---|
-| API `CLIENT_URL` | `https://<CLOUDFRONT_DOMAIN>` (CORS allowlist and the base for links in emails) |
+| API `FRONTEND_URL` | `https://<CLOUDFRONT_DOMAIN>` (CORS allowlist and the base for links in emails) |
 | Video bucket CORS `AllowedOrigins` | `https://<CLOUDFRONT_DOMAIN>` |
 | Frontend build `VITE_API_BASE_URL` | `https://<APP_RUNNER_SERVICE_DOMAIN>/api` |
 

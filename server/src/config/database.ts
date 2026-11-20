@@ -21,7 +21,7 @@ export function describeMongoUri(uri: string): string {
 
 export function validateMongoUri(uri: string | undefined): string {
   if (!uri) {
-    throw new Error('MONGODB_URI is not set. Add it to server/.env (see server/.env.example).');
+    throw new Error('MONGODB_URI is not set. Add it to server/.env locally or to the ECS task definition (see server/.env.example).');
   }
   if (!/^mongodb(\+srv)?:\/\//.test(uri)) {
     throw new Error('MONGODB_URI must start with mongodb:// or mongodb+srv://');
@@ -89,4 +89,10 @@ export async function disconnectDatabase(): Promise<void> {
 
 export function isDatabaseConnected(): boolean {
   return mongoose.connection.readyState === mongoose.ConnectionStates.connected;
+}
+
+/** Mongoose connection state as a word: connected, connecting, disconnected or disconnecting. */
+export function describeDatabaseState(): string {
+  const names: Record<number, string> = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+  return names[mongoose.connection.readyState] ?? 'unknown';
 }

@@ -34,7 +34,7 @@ Plain environment variables (not secret):
 |---|---|
 | `NODE_ENV` | `production` |
 | `PORT` | `8080` |
-| `CLIENT_URL` | `https://<CLOUDFRONT_DOMAIN>` |
+| `FRONTEND_URL` | `https://<CLOUDFRONT_DOMAIN>` |
 | `TRUST_PROXY` | `1` |
 | `JWT_EXPIRES_IN` | `1h` |
 | `LOGIN_RATE_LIMIT_MAX` | `10` |
@@ -59,7 +59,7 @@ Never set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_ENDPOINT` or `ADMIN_
 
 ### What the API checks at startup (`NODE_ENV=production`)
 
-- **Refuses to start** if `JWT_SECRET` is missing, shorter than 32 characters or a placeholder; if `MONGODB_URI` is missing or MongoDB cannot be reached within 10 s; or if `CLIENT_URL` is missing, not `https://`, points to localhost or contains a path. App Runner then marks the deployment as failed and keeps the previous version running.
+- **Refuses to start** if `JWT_SECRET` is missing, shorter than 32 characters or a placeholder; if `MONGODB_URI` is missing or MongoDB cannot be reached within 10 s; or if `FRONTEND_URL` is missing, not `https://`, points to localhost or contains a path. App Runner then marks the deployment as failed and keeps the previous version running.
 - **Warns** (CloudWatch, `"message":"Configuration warning"`) if `TRUST_PROXY=0`, SMTP or S3 settings are missing, `S3_ENDPOINT` is set, AWS keys are set, or `ADMIN_PASSWORD` is set.
 
 ## Instance role (IAM)
