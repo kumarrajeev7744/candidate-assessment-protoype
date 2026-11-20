@@ -1,4 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { ActionsMenu } from './ui/ActionsMenu';
 import { useAuth } from '../context/AuthContext';
 import { BrandMark, Icon } from './ui/Icon';
 
@@ -10,8 +11,6 @@ export function Layout() {
   // even if this browser tab also holds a recruiter session.
   const isPublicFlow = pathname.startsWith('/assessment/') || pathname.startsWith('/shared-response/');
   const signedIn = status === 'authenticated' && !isPublicFlow;
-  // Candidate reports are part of the dashboard section too.
-  const dashboardActive = pathname.startsWith('/admin/dashboard') || pathname.startsWith('/admin/candidates');
 
   function handleLogout() {
     logout();
@@ -33,28 +32,28 @@ export function Layout() {
               <span className="brand-name">Candidate Assessment Platform</span>
             </Link>
           )}
-          {signedIn && (
-            <>
-              <nav className="app-nav" aria-label="Recruiter">
-                <Link
-                  to="/admin/dashboard"
-                  className={dashboardActive ? 'app-nav-link active' : 'app-nav-link'}
-                  aria-current={dashboardActive ? 'page' : undefined}
-                >
-                  Dashboard
-                </Link>
-              </nav>
-              <div className="app-user">
-                <span className="avatar" aria-hidden="true">
-                  {admin?.email.charAt(0).toUpperCase()}
-                </span>
-                <span className="app-user-email">{admin?.email}</span>
-                <button type="button" className="button-secondary button-small" onClick={handleLogout}>
-                  <Icon name="logout" size={16} />
-                  Log out
-                </button>
-              </div>
-            </>
+          {signedIn && admin && (
+            <div className="app-user">
+              <ActionsMenu
+                label="Account menu"
+                triggerClassName="account-trigger"
+                triggerContent={
+                  <>
+                    <span className="avatar" aria-hidden="true">
+                      <Icon name="user" size={18} />
+                    </span>
+                    <Icon name="chevronDown" size={16} />
+                  </>
+                }
+                header={
+                  <>
+                    <span className="actions-menu-caption">Signed in as</span>
+                    <span className="actions-menu-email">{admin.email}</span>
+                  </>
+                }
+                actions={[{ label: 'Sign out', icon: 'logout', onSelect: handleLogout }]}
+              />
+            </div>
           )}
         </div>
       </header>

@@ -13,7 +13,7 @@ import type { Admin } from '../types/auth';
 export type AuthStatus = 'checking' | 'authenticated' | 'unauthenticated';
 
 export const SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please log in again.';
-export const LOGGED_OUT_ELSEWHERE_MESSAGE = 'You have been logged out in another tab.';
+export const LOGGED_OUT_ELSEWHERE_MESSAGE = 'You have been signed out in another tab.';
 
 interface AuthState {
   status: AuthStatus;

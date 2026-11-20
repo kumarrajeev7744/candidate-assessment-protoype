@@ -19,6 +19,7 @@ export function installFakeVideoStorage() {
       if (failDelete) throw Object.assign(new Error('AccessDenied'), { name: 'AccessDenied' });
       objects.delete(key);
     }),
+    listObjectKeys: vi.fn(async (prefix: string) => [...objects.keys()].filter((k) => k.startsWith(prefix))),
   } satisfies VideoStorage;
   setVideoStorageForTesting(storage);
   return {

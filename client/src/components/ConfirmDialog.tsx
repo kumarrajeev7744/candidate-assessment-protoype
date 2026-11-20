@@ -7,12 +7,24 @@ interface Props {
   busyLabel?: string;
   busy?: boolean;
   error?: string | null;
+  /** 'danger' styles the confirm button for destructive actions. */
+  tone?: 'default' | 'danger';
   onConfirm: () => void;
   onCancel: () => void;
 }
 
 /** Minimal accessible modal confirmation dialog. */
-export function ConfirmDialog({ title, children, confirmLabel, busyLabel, busy = false, error, onConfirm, onCancel }: Props) {
+export function ConfirmDialog({
+  title,
+  children,
+  confirmLabel,
+  busyLabel,
+  busy = false,
+  error,
+  tone = 'default',
+  onConfirm,
+  onCancel,
+}: Props) {
   const titleId = useId();
   const cancelRef = useRef<HTMLButtonElement | null>(null);
 
@@ -39,7 +51,7 @@ export function ConfirmDialog({ title, children, confirmLabel, busyLabel, busy =
           <button ref={cancelRef} type="button" className="button-secondary" onClick={onCancel} disabled={busy}>
             Cancel
           </button>
-          <button type="button" className="button-primary" onClick={onConfirm} disabled={busy}>
+          <button type="button" className={tone === 'danger' ? 'button-danger' : 'button-primary'} onClick={onConfirm} disabled={busy}>
             {busy ? (busyLabel ?? confirmLabel) : confirmLabel}
           </button>
         </div>

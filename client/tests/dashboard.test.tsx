@@ -56,6 +56,7 @@ interface Backend {
   createResult?: { status: number; body: unknown };
   resendResult?: { status: number; body: unknown };
   confirmationResult?: { status: number; body: unknown };
+  deleteResult?: { status: number; body: unknown };
 }
 
 /** Fake recruiter API: auth endpoints + candidate list (with search) + actions. */
@@ -103,6 +104,12 @@ function installBackend(backend: Backend) {
     }
     if (method === 'POST' && /^\/invitations\/[^/]+\/resend$/.test(path)) {
       const result = backend.resendResult ?? { status: 200, body: { candidate: {}, invitation: {}, email: { sent: true } } };
+      return json(result.status, result.body);
+    }
+    const del = /^\/candidates\/([^/]+)$/.exec(path);
+    if (method === 'DELETE' && del) {
+      const result = backend.deleteResult ?? { status: 200, body: { deleted: { candidate: 1 } } };
+      if (result.status === 200) backend.rows = backend.rows.filter((r) => r.candidate.id !== del[1]);
       return json(result.status, result.body);
     }
     if (method === 'POST' && /^\/invitations\/[^/]+\/resend-confirmation$/.test(path)) {
@@ -198,10 +205,10 @@ describe('Recruiter dashboard', () => {
       return labels;
     };
 
-    expect(await menuItems('Neha Completed')).toEqual(['View report', 'Resend confirmation email']);
-    expect(await menuItems('Done Sent')).toEqual(['View report']);
-    expect(await menuItems('Arjun Progress')).toEqual(['Resend invitation']); // no report until completed
-    expect(await menuItems('Priya Expired')).toEqual(['Resend invitation']);
+    expect(await menuItems('Neha Completed')).toEqual(['View report', 'Resend confirmation email', 'Delete candidate']);
+    expect(await menuItems('Done Sent')).toEqual(['View report', 'Delete candidate']);
+    expect(await menuItems('Arjun Progress')).toEqual(['Resend invitation', 'Delete candidate']); // no report until completed
+    expect(await menuItems('Priya Expired')).toEqual(['Resend invitation', 'Delete candidate']);
 
     // No separate buttons or links outside the menu.
     for (const name of ['Neha Completed', 'Arjun Progress', 'Priya Expired', 'Done Sent']) {
@@ -421,12 +428,12 @@ describe('Resend actions', () => {
     await chooseAction('Neha Completed', 'Resend confirmation email to Neha Completed');
     expect(await screen.findByText('Confirmation email sent to neha@example.com.')).toBeInTheDocument();
     expect(api.calls.some((c) => c.method === 'POST' && c.path === '/invitations/inv3/resend-confirmation')).toBe(true);
-    // After the list refreshes, only "View report" remains for Neha.
+    // After the list refreshes, the resend action is gone for Neha.
     await waitFor(async () => {
       await userEvent.click(screen.getByRole('button', { name: 'More actions for Neha Completed' }));
       const labels = within(screen.getByRole('menu')).getAllByRole('menuitem').map((m) => m.textContent);
       await userEvent.keyboard('{Escape}');
-      expect(labels).toEqual(['View report']);
+      expect(labels).toEqual(['View report', 'Delete candidate']);
     });
   });
 
@@ -482,5 +489,51 @@ describe('Row actions menu', () => {
     await userEvent.keyboard('{Enter}');
     await userEvent.keyboard('{Enter}');
     expect(await screen.findByRole('dialog', { name: 'Resend invitation?' })).toBeInTheDocument();
+  });
+});
+
+describe('Delete candidate', () => {
+  it('asks for confirmation, deletes and refreshes the list', async () => {
+    const api = await openDashboard({ rows: ROWS });
+    await screen.findByRole('table');
+    await chooseAction('Arjun Progress', 'Delete candidate Arjun Progress');
+    const dialog = await screen.findByRole('dialog', { name: 'Delete candidate?' });
+    expect(dialog).toHaveTextContent('permanently deletes Arjun Progress (arjun@example.com)');
+    expect(dialog).toHaveTextContent('recorded videos');
+    expect(dialog).toHaveTextContent('cannot be undone');
+    const confirm = within(dialog).getByRole('button', { name: 'Delete permanently' });
+    expect(confirm).toHaveClass('button-danger');
+
+    await userEvent.click(confirm);
+    expect(await screen.findByText('Arjun Progress and all of their data were permanently deleted.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('cell', { name: 'Arjun Progress' })).not.toBeInTheDocument());
+    expect(api.calls.some((c) => c.method === 'DELETE' && c.path === '/candidates/cand-inv2')).toBe(true);
+  });
+
+  it('does nothing when cancelled', async () => {
+    const api = await openDashboard({ rows: ROWS });
+    await screen.findByRole('table');
+    await chooseAction('Arjun Progress', 'Delete candidate Arjun Progress');
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+    expect(api.calls.some((c) => c.method === 'DELETE')).toBe(false);
+    expect(screen.getByRole('cell', { name: 'Arjun Progress' })).toBeInTheDocument();
+  });
+
+  it('shows an error in the dialog when deletion fails, and allows retry', async () => {
+    const api = await openDashboard({
+      rows: ROWS,
+      deleteResult: { status: 502, body: { error: { code: 'VIDEO_DELETE_FAILED', message: '2 video file(s) could not be deleted from storage. The candidate was not deleted; please try again.' } } },
+    });
+    await screen.findByRole('table');
+    await chooseAction('Neha Completed', 'Delete candidate Neha Completed');
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete permanently' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('The candidate was not deleted');
+    expect(screen.getByRole('cell', { name: 'Neha Completed' })).toBeInTheDocument();
+
+    api.backend.deleteResult = undefined;
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete permanently' }));
+    expect(await screen.findByText('Neha Completed and all of their data were permanently deleted.')).toBeInTheDocument();
   });
 });

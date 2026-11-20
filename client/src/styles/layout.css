@@ -46,10 +46,8 @@
 @media (max-width: 760px) {
   .app-header-inner { padding: var(--space-2) var(--space-4); gap: var(--space-3); }
   .brand-name { font-size: var(--text-md); }
-  /* Signed-in recruiters: mark only, so brand, nav and account fit on one row. */
-  .app-header-inner:has(.app-user) .brand-name { display: none; }
   .app-user-email { display: none; }
-  .app-user .avatar { display: none; }
+
   .app-main { padding: var(--space-5) var(--space-4) var(--space-10); }
   .page, .card { padding: var(--space-5); border-radius: var(--radius-lg); }
 }

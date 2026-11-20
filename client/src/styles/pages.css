@@ -353,3 +353,11 @@
   .candidate-table td { grid-template-columns: 6.5rem 1fr; }
   .candidate-table .cell-email { overflow-wrap: anywhere; }
 }
+
+/* Share full report + shared full report */
+.report-share-all { margin-left: auto; }
+@media (max-width: 600px) {
+  .report-header { flex-wrap: wrap; }
+  .report-share-all { margin-left: 0; width: 100%; }
+}
+.shared-report-list { margin-top: var(--space-5); }

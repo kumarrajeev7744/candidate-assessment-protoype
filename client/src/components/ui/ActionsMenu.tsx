@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Icon, type IconName } from './Icon';
 
 export interface MenuAction {
@@ -7,6 +7,8 @@ export interface MenuAction {
   /** Accessible name (e.g. including the candidate name). Defaults to label. */
   ariaLabel?: string;
   icon?: IconName;
+  /** Destructive action (shown in red). */
+  danger?: boolean;
   onSelect: () => void;
 }
 
@@ -15,6 +17,11 @@ interface Props {
   label: string;
   actions: MenuAction[];
   disabled?: boolean;
+  /** Custom trigger content (defaults to the "⋯" icon). */
+  triggerContent?: ReactNode;
+  triggerClassName?: string;
+  /** Non-interactive content shown above the items (e.g. the signed-in email). */
+  header?: ReactNode;
 }
 
 const MENU_WIDTH = 240;
@@ -24,7 +31,14 @@ const MENU_WIDTH = 240;
  * clipped by a scrolling table, and follows its button while the page scrolls.
  * Keyboard: Enter/Space/ArrowDown open; arrows move; Escape closes.
  */
-export function ActionsMenu({ label, actions, disabled = false }: Props) {
+export function ActionsMenu({
+  label,
+  actions,
+  disabled = false,
+  triggerContent,
+  triggerClassName = 'button-secondary button-small button-icon',
+  header,
+}: Props) {
   const menuId = useId();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const itemsRef = useRef<Array<HTMLButtonElement | null>>([]);
@@ -41,12 +55,12 @@ export function ActionsMenu({ label, actions, disabled = false }: Props) {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return null;
     const itemHeight = 44;
-    const height = actions.length * itemHeight + 12;
+    const height = actions.length * itemHeight + 12 + (header ? 64 : 0);
     const below = rect.bottom + 6;
     const top = below + height > window.innerHeight && rect.top - height - 6 > 0 ? rect.top - height - 6 : below;
     const left = Math.max(8, Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8));
     return { top, left, triggerVisible: rect.bottom > 0 && rect.top < window.innerHeight };
-  }, [actions.length]);
+  }, [actions.length, header]);
 
   const openMenu = () => {
     const next = computePosition();
@@ -113,7 +127,7 @@ export function ActionsMenu({ label, actions, disabled = false }: Props) {
       <button
         ref={triggerRef}
         type="button"
-        className="button-secondary button-small button-icon"
+        className={triggerClassName}
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -122,7 +136,7 @@ export function ActionsMenu({ label, actions, disabled = false }: Props) {
         onClick={() => (open ? close() : openMenu())}
         onKeyDown={onTriggerKey}
       >
-        <Icon name="moreHorizontal" size={20} />
+        {triggerContent ?? <Icon name="moreHorizontal" size={20} />}
       </button>
       {open && position && (
         <div
@@ -133,6 +147,7 @@ export function ActionsMenu({ label, actions, disabled = false }: Props) {
           style={{ top: position.top, left: position.left, width: MENU_WIDTH }}
           onKeyDown={onMenuKey}
         >
+          {header && <div className="actions-menu-header">{header}</div>}
           {actions.map((action, i) => (
             <button
               key={action.label}
@@ -141,7 +156,7 @@ export function ActionsMenu({ label, actions, disabled = false }: Props) {
               }}
               type="button"
               role="menuitem"
-              className="actions-menu-item"
+              className={action.danger ? 'actions-menu-item is-danger' : 'actions-menu-item'}
               aria-label={action.ariaLabel ?? action.label}
               onClick={() => {
                 close(true);

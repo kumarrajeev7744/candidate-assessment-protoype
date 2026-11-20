@@ -1,6 +1,8 @@
 import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { AuthProvider } from '../../src/context/AuthContext';
 import { AppRoutes } from '../../src/routes/AppRoutes';
 
@@ -49,4 +51,10 @@ export const ADMIN = { id: 'admin-1', email: 'recruiter@example.com', createdAt:
 
 export function futureIso(ms = 60 * 60 * 1000): string {
   return new Date(Date.now() + ms).toISOString();
+}
+
+/** Opens the header account menu and chooses "Sign out". */
+export async function signOutViaMenu() {
+  await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
 }

@@ -2,6 +2,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
   S3ServiceException,
@@ -22,6 +23,8 @@ export interface VideoStorage {
   /** Returns null when the object does not exist. */
   headObject(key: string): Promise<StoredObjectInfo | null>;
   deleteObject(key: string): Promise<void>;
+  /** All object keys under a prefix (e.g. one candidate's video folder). */
+  listObjectKeys(prefix: string): Promise<string[]>;
 }
 
 export class VideoStorageNotConfiguredError extends AppError {
@@ -68,6 +71,19 @@ export class S3VideoStorage implements VideoStorage {
 
   async deleteObject(key: string): Promise<void> {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+  }
+
+  async listObjectKeys(prefix: string): Promise<string[]> {
+    const keys: string[] = [];
+    let token: string | undefined;
+    do {
+      const page = await this.client.send(
+        new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: token }),
+      );
+      for (const item of page.Contents ?? []) if (item.Key) keys.push(item.Key);
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+    return keys;
   }
 }
 

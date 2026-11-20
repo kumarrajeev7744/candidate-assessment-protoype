@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../services/apiClient';
 import { listCandidates, resendConfirmationEmail, resendInvitation } from '../services/recruiterService';
+import { deleteCandidate } from '../services/reportService';
 import type { CandidateListItem, CandidateListResponse, InvitationActionResult } from '../types/recruiter';
 import { formatShortDateTime } from '../utils/format';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -33,6 +34,8 @@ export function DashboardPage() {
   const [creating, setCreating] = useState(false);
   const [resendTarget, setResendTarget] = useState<CandidateListItem | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CandidateListItem | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Load the list whenever the search, page or reload counter changes.
   useEffect(() => {
@@ -170,7 +173,36 @@ export function DashboardPage() {
         onSelect: () => void handleResendConfirmation(item),
       });
     }
+    actions.push({
+      label: 'Delete candidate',
+      ariaLabel: `Delete candidate ${item.candidate.name}`,
+      icon: 'trash',
+      danger: true,
+      onSelect: () => {
+        setDeleteError(null);
+        setDeleteTarget(item);
+      },
+    });
     return actions;
+  }
+
+  async function confirmDelete() {
+    const item = deleteTarget;
+    if (!item) return;
+    setBusyId(item.id);
+    setDeleteError(null);
+    try {
+      await deleteCandidate(item.candidate.id);
+      setDeleteTarget(null);
+      setFeedback({ kind: 'success', text: `${item.candidate.name} and all of their data were permanently deleted.` });
+      refresh();
+    } catch (err) {
+      if (!(err instanceof ApiError && err.status === 401)) {
+        setDeleteError(errorText(err, 'The candidate could not be deleted. Please try again.'));
+      }
+    } finally {
+      setBusyId(null);
+    }
   }
 
   const items = data?.items ?? [];
@@ -345,6 +377,24 @@ export function DashboardPage() {
       )}
 
       {creating && <CreateCandidateDialog onCreated={handleCreated} onClose={() => setCreating(false)} />}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete candidate?"
+          confirmLabel="Delete permanently"
+          busyLabel="Deleting…"
+          tone="danger"
+          busy={busyId === deleteTarget.id}
+          error={deleteError}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setDeleteTarget(null)}
+        >
+          <p>
+            This permanently deletes <strong>{deleteTarget.candidate.name}</strong> ({deleteTarget.candidate.email}):
+            their invitation, written answers, recorded videos and any shared links. This cannot be undone.
+          </p>
+        </ConfirmDialog>
+      )}
 
       {resendTarget && (
         <ConfirmDialog

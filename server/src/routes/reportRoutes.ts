@@ -1,14 +1,22 @@
 import { Router } from 'express';
-import { candidateReportHandler, sharedResponseHandler, shareResponseHandler } from '../controllers/reportController.js';
+import {
+  candidateReportHandler,
+  deleteCandidateHandler,
+  sharedResponseHandler,
+  shareReportHandler,
+  shareResponseHandler,
+} from '../controllers/reportController.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { createPublicRateLimiter } from '../middleware/rateLimiters.js';
-import { shareResponseSchema } from '../validation/invitationSchemas.js';
+import { shareReportSchema, shareResponseSchema } from '../validation/invitationSchemas.js';
 
-/** Recruiter: GET /api/candidates/:candidateId/report */
+/** Recruiter: candidate report, full-report sharing and deletion. */
 export function createCandidateRouter(): Router {
   const router = Router();
   router.get('/:candidateId/report', requireAuth, candidateReportHandler);
+  router.post('/:candidateId/share', requireAuth, validateBody(shareReportSchema), shareReportHandler);
+  router.delete('/:candidateId', requireAuth, deleteCandidateHandler);
   return router;
 }
 
