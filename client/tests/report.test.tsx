@@ -332,3 +332,22 @@ describe('Share full report', () => {
     expect(screen.queryByRole('button', { name: 'Share full report' })).not.toBeInTheDocument();
   });
 });
+
+describe('Rejected candidate report', () => {
+  it('shows the rejection reason, date and recruiter', async () => {
+    const base = makeReport();
+    await openReport({
+      report: makeReport({
+        candidate: {
+          ...base.candidate,
+          rejection: { reason: 'Limited enterprise experience.', rejectedAt: '2026-11-20T09:00:00Z', rejectedBy: 'recruiter@example.com' },
+        },
+      }),
+    });
+    await screen.findByRole('heading', { level: 1, name: 'Priya Sharma' });
+    const panel = screen.getByRole('note', { name: 'Rejection' });
+    expect(panel).toHaveTextContent('Rejected');
+    expect(panel).toHaveTextContent('Limited enterprise experience.');
+    expect(panel).toHaveTextContent('by recruiter@example.com');
+  });
+});

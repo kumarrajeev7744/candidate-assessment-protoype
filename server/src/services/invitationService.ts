@@ -161,6 +161,9 @@ export async function resendInvitation(invitationId: string): Promise<Invitation
   }
   const candidate = await Candidate.findById(invitation.candidateId);
   if (!candidate) throw new AppError(404, 'Candidate not found for this invitation.', 'CANDIDATE_NOT_FOUND');
+  if (candidate.rejection) {
+    throw new AppError(409, 'This candidate has been rejected. Undo the rejection to resend the invitation.', 'CANDIDATE_REJECTED');
+  }
 
   // Do not invalidate the existing link if a new one cannot be emailed at all.
   if (!isEmailConfigured()) throw new EmailNotConfiguredError();

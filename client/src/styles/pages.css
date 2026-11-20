@@ -361,3 +361,16 @@
   .report-share-all { margin-left: 0; width: 100%; }
 }
 .shared-report-list { margin-top: var(--space-5); }
+
+/* Clickable completed rows */
+.candidate-table tr.is-clickable { cursor: pointer; }
+.candidate-table .row-link { color: inherit; text-decoration: none; }
+.candidate-table .row-link:hover { color: var(--violet-700); text-decoration: underline; }
+
+/* Rejection */
+.rejection-panel {
+  border: 1px solid var(--danger-200); background: var(--danger-50); border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4);
+}
+.rejection-panel-title { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; font-size: var(--text-sm); color: var(--gray-600); }
+.page .rejection-reason, .rejection-reason { margin: var(--space-2) 0 0; color: var(--color-text); white-space: pre-wrap; overflow-wrap: anywhere; }

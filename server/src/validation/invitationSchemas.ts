@@ -65,3 +65,13 @@ export const shareReportSchema = z.object({
 });
 
 export type ShareReportInput = z.infer<typeof shareReportSchema>;
+
+export const rejectCandidateSchema = z.object({
+  reason: z
+    .string({ error: 'Rejection reason is required' })
+    .trim()
+    .min(1, 'Rejection reason is required')
+    .max(500, 'Rejection reason cannot exceed 500 characters'),
+});
+
+export type RejectCandidateInput = z.infer<typeof rejectCandidateSchema>;

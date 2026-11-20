@@ -4,6 +4,7 @@ import { AppError } from '../utils/AppError.js';
 import { isExpired } from '../utils/dates.js';
 import { loadActiveQuestions } from './assessmentService.js';
 import { toVideoPlayback, type VideoPlaybackDto } from './videoPlayback.js';
+import { toRejectionDto, type RejectionDto } from './rejectionService.js';
 
 export type ReportQuestionStatus = 'Complete' | 'Incomplete' | 'Not Started';
 
@@ -23,7 +24,7 @@ export interface ReportQuestionDto {
 }
 
 export interface CandidateReportDto {
-  candidate: { id: string; name: string; email: string };
+  candidate: { id: string; name: string; email: string; rejection: RejectionDto | null };
   assessment: {
     status: InvitationStatus;
     invitedAt: string;
@@ -44,7 +45,7 @@ export function assertObjectId(value: string, label: string): void {
 /** Recruiter report: the candidate, their assessment status and all 10 questions with responses. */
 export async function getCandidateReport(candidateId: string): Promise<CandidateReportDto> {
   assertObjectId(candidateId, 'candidate');
-  const candidate = await Candidate.findById(candidateId).select('name email').lean();
+  const candidate = await Candidate.findById(candidateId).select('name email rejection').lean();
   if (!candidate) throw new AppError(404, 'Candidate not found.', 'CANDIDATE_NOT_FOUND');
   const invitation = await Invitation.findOne({ candidateId: candidate._id })
     .select('status invitedAt expiresAt completedAt')
@@ -80,7 +81,12 @@ export async function getCandidateReport(candidateId: string): Promise<Candidate
   );
 
   return {
-    candidate: { id: candidate._id.toString(), name: candidate.name, email: candidate.email },
+    candidate: {
+      id: candidate._id.toString(),
+      name: candidate.name,
+      email: candidate.email,
+      rejection: toRejectionDto(candidate.rejection),
+    },
     assessment: {
       status: invitation.status,
       invitedAt: invitation.invitedAt.toISOString(),

@@ -2,7 +2,8 @@ import type { Request, Response } from 'express';
 import { getCandidateReport } from '../services/reportService.js';
 import { getSharedContent, shareCandidateReport, shareResponse } from '../services/shareService.js';
 import { deleteCandidate } from '../services/candidateDeletionService.js';
-import type { ShareReportInput, ShareResponseInput } from '../validation/invitationSchemas.js';
+import { rejectCandidate, undoRejection } from '../services/rejectionService.js';
+import type { RejectCandidateInput, ShareReportInput, ShareResponseInput } from '../validation/invitationSchemas.js';
 
 export async function candidateReportHandler(req: Request<{ candidateId: string }>, res: Response): Promise<void> {
   res.set('Cache-Control', 'no-store');
@@ -27,4 +28,13 @@ export async function shareReportHandler(req: Request<{ candidateId: string }>, 
 
 export async function deleteCandidateHandler(req: Request<{ candidateId: string }>, res: Response): Promise<void> {
   res.status(200).json(await deleteCandidate(req.params.candidateId));
+}
+
+export async function rejectCandidateHandler(req: Request<{ candidateId: string }>, res: Response): Promise<void> {
+  const { reason } = req.body as RejectCandidateInput;
+  res.status(200).json(await rejectCandidate(req.params.candidateId, reason, req.admin!.email));
+}
+
+export async function undoRejectionHandler(req: Request<{ candidateId: string }>, res: Response): Promise<void> {
+  res.status(200).json(await undoRejection(req.params.candidateId));
 }

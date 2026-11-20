@@ -185,6 +185,17 @@ export function CandidateReportPage() {
           </dd>
         </div>
       </dl>
+      {candidate.rejection && (
+        <div className="rejection-panel" role="note" aria-label="Rejection">
+          <div className="rejection-panel-title">
+            <span className="badge badge-danger">Rejected</span>
+            <span>
+              {formatShortDateTime(candidate.rejection.rejectedAt)} by {candidate.rejection.rejectedBy}
+            </span>
+          </div>
+          <p className="rejection-reason">{candidate.rejection.reason}</p>
+        </div>
+      )}
       {assessment.status !== 'Completed' && (
         <p className="notice">This assessment has not been submitted yet. Responses can be shared once it is completed.</p>
       )}

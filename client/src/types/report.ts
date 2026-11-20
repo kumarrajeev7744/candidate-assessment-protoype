@@ -1,3 +1,4 @@
+import type { Rejection } from './recruiter';
 import type { InvitationStatus } from './invitation';
 
 export interface VideoPlayback {
@@ -24,7 +25,7 @@ export interface ReportQuestion {
 }
 
 export interface CandidateReport {
-  candidate: { id: string; name: string; email: string };
+  candidate: { id: string; name: string; email: string; rejection: Rejection | null };
   assessment: {
     status: InvitationStatus;
     invitedAt: string;

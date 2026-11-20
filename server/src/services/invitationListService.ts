@@ -2,6 +2,7 @@ import type { PipelineStage, Types } from 'mongoose';
 import { Invitation, type EmailStatus, type InvitationStatus } from '../models/index.js';
 import { isExpired } from '../utils/dates.js';
 import type { ListInvitationsQuery } from '../validation/invitationSchemas.js';
+import { toRejectionDto } from './rejectionService.js';
 
 /** One dashboard row. Contains no tokens, hashes or storage keys. */
 export interface InvitationListItem {
@@ -17,6 +18,8 @@ export interface InvitationListItem {
   confirmationEmailSentAt: string | null;
   canResendInvitation: boolean;
   canResendConfirmation: boolean;
+  /** Recruiter's rejection decision, if any. */
+  rejection: { reason: string; rejectedAt: string; rejectedBy: string } | null;
 }
 
 export interface InvitationListResult {
@@ -34,7 +37,12 @@ interface Row {
   emailStatus: EmailStatus;
   confirmationEmailStatus?: EmailStatus;
   confirmationEmailSentAt?: Date;
-  candidate: { _id: Types.ObjectId; name: string; email: string };
+  candidate: {
+    _id: Types.ObjectId;
+    name: string;
+    email: string;
+    rejection?: { reason: string; rejectedAt: Date; rejectedBy: string };
+  };
 }
 
 /** Escapes user input for use inside a RegExp (search is a literal "contains" match). */
@@ -44,6 +52,7 @@ export function escapeRegExp(value: string): string {
 
 function toItem(row: Row): InvitationListItem {
   const completed = row.status === 'Completed';
+  const rejected = Boolean(row.candidate.rejection);
   return {
     id: row._id.toString(),
     candidate: { id: row.candidate._id.toString(), name: row.candidate.name, email: row.candidate.email },
@@ -55,8 +64,9 @@ function toItem(row: Row): InvitationListItem {
     emailStatus: row.emailStatus,
     confirmationEmailStatus: row.confirmationEmailStatus ?? null,
     confirmationEmailSentAt: row.confirmationEmailSentAt ? row.confirmationEmailSentAt.toISOString() : null,
-    canResendInvitation: !completed,
+    canResendInvitation: !completed && !rejected,
     canResendConfirmation: completed && row.confirmationEmailStatus !== 'Sent',
+    rejection: toRejectionDto(row.candidate.rejection),
   };
 }
 
@@ -94,6 +104,7 @@ export async function listInvitations(query: ListInvitationsQuery): Promise<Invi
               'candidate._id': 1,
               'candidate.name': 1,
               'candidate.email': 1,
+              'candidate.rejection': 1,
             },
           },
         ],

@@ -15,6 +15,13 @@ export interface CandidateListItem {
   confirmationEmailSentAt: string | null;
   canResendInvitation: boolean;
   canResendConfirmation: boolean;
+  rejection: Rejection | null;
+}
+
+export interface Rejection {
+  reason: string;
+  rejectedAt: string;
+  rejectedBy: string;
 }
 
 export interface CandidateListResponse {
