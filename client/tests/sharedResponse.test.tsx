@@ -19,6 +19,7 @@ function installPublicApi(responses: Array<{ status: number; body: unknown } | '
 }
 
 const SHARED = (n = 1) => ({
+  type: 'response' as const,
   candidateName: 'Priya Sharma',
   question: { number: 3, text: 'Describe a deal you closed.' },
   response: {
@@ -86,6 +87,50 @@ describe('Public shared response page', () => {
       fireEvent.error(player);
     });
     await waitFor(() => expect(screen.getByLabelText('Video answer')).toHaveAttribute('src', 'https://s3.test/v.webm?sig=2'));
+    expect(api.calls).toHaveLength(2);
+  });
+});
+
+describe('Public shared full report', () => {
+  const REPORT = (sig = 1) => ({
+    type: 'report' as const,
+    candidateName: 'Priya Sharma',
+    questions: Array.from({ length: 10 }, (_, i) => ({
+      number: i + 1,
+      text: `Shared question ${i + 1}?`,
+      writtenAnswer: i === 4 ? '' : `Answer ${i + 1}`,
+      video:
+        i === 6
+          ? { status: 'Missing', available: false, url: null, mimeType: null, urlExpiresAt: null }
+          : { status: 'Uploaded', available: true, url: `https://s3.test/v${i + 1}.webm?sig=${sig}`, mimeType: 'video/webm', urlExpiresAt: '2030-01-01T00:00:00Z' },
+    })),
+    expiresAt: '2026-11-27T10:00:00Z',
+  });
+
+  it('shows all questions with answers and videos, read-only', async () => {
+    installPublicApi([{ status: 200, body: REPORT() }]);
+    renderApp(`/shared-response/${TOKEN}`);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Priya Sharma' })).toBeInTheDocument();
+    expect(screen.getByText(/Shared candidate assessment · read-only/)).toBeInTheDocument();
+    const items = screen.getAllByRole('listitem', { name: /^Question \d+$/ });
+    expect(items).toHaveLength(10);
+    expect(screen.getByText('Shared question 3?')).toBeInTheDocument();
+    expect(screen.getByText('Answer 3')).toBeInTheDocument();
+    expect(screen.getByLabelText('Video answer to question 3')).toHaveAttribute('src', 'https://s3.test/v3.webm?sig=1');
+    expect(screen.getAllByText('No written answer')).toHaveLength(1);
+    expect(screen.getAllByText('No video was recorded for this question.')).toHaveLength(1);
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('refreshes an expired video URL for the right question', async () => {
+    const api = installPublicApi([{ status: 200, body: REPORT(1) }, { status: 200, body: REPORT(2) }]);
+    renderApp(`/shared-response/${TOKEN}`);
+    const player = await screen.findByLabelText('Video answer to question 4');
+    await act(async () => {
+      fireEvent.error(player);
+    });
+    await waitFor(() => expect(screen.getByLabelText('Video answer to question 4')).toHaveAttribute('src', 'https://s3.test/v4.webm?sig=2'));
     expect(api.calls).toHaveLength(2);
   });
 });

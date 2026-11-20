@@ -41,7 +41,7 @@ function installBackend(backend: Backend) {
       for (const q of fresh.questions) if (q.response?.video.url) q.response.video.url += `&v=${reportCalls}`;
       return json(200, fresh);
     }
-    const share = /^\/responses\/([^/]+)\/share$/.exec(path);
+    const share = /^\/responses\/([^/]+)\/share$/.exec(path) ?? /^\/candidates\/([^/]+)\/share$/.exec(path);
     if (method === 'POST' && share) {
       if (backend.shareDelayMs) await new Promise((r) => setTimeout(r, backend.shareDelayMs));
       const result = backend.shareResults?.shift() ?? {
@@ -302,5 +302,33 @@ describe('Video failure diagnostics', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     await failTwice(2);
     expect(await within(item(2)).findByText(/This browser cannot play video\/webm videos\. Please open the report in Chrome, Edge or Firefox\./)).toBeInTheDocument();
+  });
+});
+
+describe('Share full report', () => {
+  it('is offered for completed assessments and shares the whole report', async () => {
+    const api = await openReport({ report: makeReport() });
+    await screen.findByRole('heading', { level: 1, name: 'Priya Sharma' });
+    await userEvent.click(screen.getByRole('button', { name: 'Share full report' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Share full report' });
+    expect(dialog).toHaveTextContent('complete assessment: all 10 questions');
+    await userEvent.type(within(dialog).getByLabelText('Hiring manager’s email'), 'manager@example.com');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }));
+    expect(await within(dialog).findByRole('status')).toHaveTextContent('The full report was shared with manager@example.com');
+    const call = api.calls.find((c) => c.method === 'POST')!;
+    expect(call.path).toBe(`/candidates/${CANDIDATE_ID}/share`);
+    expect(call.body).toEqual({ recipientEmail: 'manager@example.com' });
+  });
+
+  it('is not offered before the assessment is submitted', async () => {
+    const base = makeReport();
+    await openReport({
+      report: makeReport({
+        assessment: { ...base.assessment, status: 'In Progress', completedAt: null },
+        questions: base.questions.map((q) => ({ ...q, canShare: false })),
+      }),
+    });
+    await screen.findByRole('heading', { level: 1, name: 'Priya Sharma' });
+    expect(screen.queryByRole('button', { name: 'Share full report' })).not.toBeInTheDocument();
   });
 });

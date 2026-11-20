@@ -1,8 +1,7 @@
 import { act, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { getStoredSession, storeSession } from '../src/utils/tokenStorage';
 import { broadcastLogout, onLogoutInOtherTab } from '../src/utils/authBroadcast';
-import { ADMIN, futureIso, mockApi, renderApp } from './helpers/renderApp';
+import { ADMIN, futureIso, mockApi, renderApp, signOutViaMenu } from './helpers/renderApp';
 
 async function signedInDashboard() {
   storeSession({ token: 'jwt', expiresAt: futureIso() });
@@ -23,7 +22,7 @@ describe('Logout across tabs', () => {
     });
     otherTab.close();
     expect(await screen.findByRole('heading', { name: 'Recruiter login' })).toBeInTheDocument();
-    expect(screen.getByText('You have been logged out in another tab.')).toBeInTheDocument();
+    expect(screen.getByText('You have been signed out in another tab.')).toBeInTheDocument();
     expect(getStoredSession()).toBeNull();
   });
 
@@ -55,7 +54,7 @@ describe('Logout across tabs', () => {
     const otherTab = new BroadcastChannel('candidate-assessment-auth');
     otherTab.onmessage = (m) => received.push(m.data);
     await signedInDashboard();
-    await userEvent.click(screen.getByRole('button', { name: /Log out/ }));
+    await signOutViaMenu();
     await waitFor(() => expect(received).toHaveLength(1));
     otherTab.close();
     expect(received[0]).toEqual({ type: 'logout', at: expect.any(Number) });

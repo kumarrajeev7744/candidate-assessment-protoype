@@ -43,8 +43,18 @@ export interface ShareResult {
 }
 
 export interface SharedResponse {
+  type: 'response';
   candidateName: string;
   question: { number: number; text: string };
   response: { writtenAnswer: string; video: VideoPlayback };
   expiresAt: string;
 }
+
+export interface SharedReport {
+  type: 'report';
+  candidateName: string;
+  questions: Array<{ number: number; text: string; writtenAnswer: string; video: VideoPlayback }>;
+  expiresAt: string;
+}
+
+export type SharedContent = SharedResponse | SharedReport;

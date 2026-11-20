@@ -99,6 +99,7 @@ Log in at `http://localhost:5173/admin/login`.
 
 ### Recruiter dashboard (`/admin/dashboard`)
 
+- Header: the logo returns to the dashboard; the account icon on the right opens a menu with your email and **Sign out** (signing out ends the session in every open tab).
 - Candidate table: name, email, invitation, expiry and completion dates, status (Invited / In Progress / Completed, plus an Expired badge and email-failure notes) and actions. On phones each row is shown as a card.
 - Search by name or email (server-side, debounced), Refresh, pagination (50 per page), loading / empty / error states.
 - **Create Candidate** dialog (validated in the browser and on the server; duplicates rejected) – sends the invitation email.
@@ -110,12 +111,16 @@ Log in at `http://localhost:5173/admin/login`.
 
 - `/admin/candidates/:candidateId` – candidate details (email, status, invitation / completion / expiry dates) and all 10 questions with written answer, video player and completion status; clear states for missing answers or videos. Video URLs are short-lived; if one has expired the player fetches a fresh one.
 - **Share** (completed assessments, questions with a response): emails a hiring manager a link to **that one response**. The link expires after 7 days and needs no login.
-- `/shared-response/:token` – public, read-only page with only the candidate name, that question, the written answer and the video. Invalid and expired links show clear messages.
+- **Share full report** (completed assessments): emails a link to the candidate's whole assessment (all questions, written and video).
+- **Delete candidate** (dashboard ⋯ menu): permanently removes the candidate and all their data from MongoDB and S3 after a confirmation.
+- `/shared-response/:token` – public, read-only page: either the single shared question (`type: "response"`) or the full assessment (`type: "report"`), with written answers and videos. Invalid and expired links show clear messages.
 
 | Endpoint | Auth | Description |
 |---|---|---|
 | `GET /api/candidates/:candidateId/report` | Bearer JWT | `{ candidate, assessment, questions[], summary }`. Each question: `questionId, questionNumber, questionText, status, response: { id, writtenAnswer, hasWrittenAnswer, video: { status, available, url, mimeType, urlExpiresAt } } \| null, canShare`. 400 bad ID, 404 unknown candidate |
 | `POST /api/responses/:responseId/share` | Bearer JWT | `{ candidateId, recipientEmail }` → 201 `{ shareLink: { id, recipientEmail, createdAt, expiresAt, emailStatus, emailSentAt }, reused, email: { sent: true } }`. 404 response not found for that candidate, 409 not completed / nothing to share, **502 `EMAIL_DELIVERY_FAILED`** (nothing shared), 503 email not configured |
+| `POST /api/candidates/:candidateId/share` | Bearer JWT | `{ recipientEmail }` → shares the candidate's **full assessment** (all questions) by email. Completed assessments only; same hashing, 7-day expiry, 502-on-email-failure and retry-reuse rules as single shares |
+| `DELETE /api/candidates/:candidateId` | Bearer JWT | Permanently deletes the candidate: all their S3 videos (including replaced/abandoned uploads under their folders), then share links, responses, invitation and candidate record in one transaction. If any video cannot be deleted, nothing is removed from MongoDB (502 `VIDEO_DELETE_FAILED`) so it can be retried. Returns `{ deleted: { candidate, invitations, responses, shareLinks, videos } }` |
 | `GET /api/shared-responses/:token` | Public | `{ candidateName, question: { number, text }, response: { writtenAnswer, video }, expiresAt }`. 404 invalid, 410 expired. Read-only, rate limited |
 
 Share tokens are 256-bit random values; only their SHA-256 hash is stored, and the raw token/URL is never returned by the API or logged. A link is usable only after its email was delivered. If sending fails, sharing the same response with the same recipient again **reuses** that record with a new token and the original expiry, so retries never create duplicate links.
@@ -208,7 +213,7 @@ The presigned PUT signs `Content-Type` and `Content-Length`, so S3 rejects uploa
 | `invitations` | candidateId, tokenHash, status, invitedAt, expiresAt (+7 days), completedAt, emailStatus, confirmationEmailStatus / SentAt / LastAttemptAt, responseVersion | candidateId (unique), tokenHash (unique) |
 | `questions` | questionNumber (1–10), questionText, isActive | questionNumber (unique) |
 | `responses` | candidateId, questionId, writtenAnswer (≤1,000 chars), video {objectKey, mimeType, sizeBytes, uploadStatus, uploadedAt} | candidateId + questionId (unique) |
-| `sharelinks` | responseId, tokenHash, recipientEmail, createdAt, expiresAt (+7 days), emailStatus, emailSentAt, emailLastAttemptAt | responseId, tokenHash (unique) |
+| `sharelinks` | scope (`response`/`report`), responseId (single shares), candidateId, tokenHash, recipientEmail, createdAt, expiresAt (+7 days), emailStatus, emailSentAt, emailLastAttemptAt | responseId, tokenHash (unique) |
 
 Only SHA-256 hashes of invitation/share tokens are stored. There are no TTL indexes: expired invitations and share links are kept for history and checked at access time.
 

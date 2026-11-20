@@ -1,7 +1,7 @@
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import { ADMIN, futureIso, mockApi, renderApp } from './helpers/renderApp';
+import { ADMIN, futureIso, mockApi, renderApp, signOutViaMenu } from './helpers/renderApp';
 import { getStoredSession, storeSession } from '../src/utils/tokenStorage';
 
 const loginOk = () => ({ status: 200, body: { token: 'jwt-token', expiresAt: futureIso(), admin: ADMIN } });
@@ -50,7 +50,9 @@ describe('Login page', () => {
 
     await act(async () => release());
     expect(await screen.findByRole('heading', { name: 'Candidates' })).toBeInTheDocument();
-    expect(screen.getByRole('banner')).toHaveTextContent('recruiter@example.com');
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+    expect(screen.getByRole('menu', { name: 'Account menu' })).toHaveTextContent('recruiter@example.com');
+    await userEvent.keyboard('{Escape}');
     expect(getStoredSession()?.token).toBe('jwt-token');
 
     const [, init] = fetchMock.mock.calls[0]!;
@@ -172,13 +174,15 @@ describe('Logout', () => {
     });
     renderApp('/admin/dashboard');
     await screen.findByRole('heading', { name: 'Candidates' });
-    expect(screen.getByRole('banner')).toHaveTextContent('recruiter@example.com');
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+    expect(screen.getByRole('menu', { name: 'Account menu' })).toHaveTextContent('recruiter@example.com');
+    await userEvent.keyboard('{Escape}');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    await signOutViaMenu();
 
     expect(await screen.findByRole('heading', { name: 'Recruiter login' })).toBeInTheDocument();
     expect(getStoredSession()).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Account menu' })).not.toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true);
 
     // Protected pages are no longer accessible.

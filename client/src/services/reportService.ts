@@ -1,5 +1,5 @@
 import { apiRequest } from './apiClient';
-import type { CandidateReport, SharedResponse, ShareResult } from '../types/report';
+import type { CandidateReport, SharedContent, ShareResult } from '../types/report';
 
 /** Recruiter: full report for one candidate (fresh presigned video URLs on every call). */
 export function getCandidateReport(candidateId: string): Promise<CandidateReport> {
@@ -15,7 +15,24 @@ export function shareResponse(responseId: string, input: { candidateId: string; 
   });
 }
 
-/** Public (hiring manager): the single shared response for a share link token. */
-export function getSharedResponse(token: string): Promise<SharedResponse> {
-  return apiRequest<SharedResponse>(`/shared-responses/${encodeURIComponent(token)}`);
+/** Recruiter: email a link to the candidate's full assessment to a hiring manager. */
+export function shareFullReport(candidateId: string, recipientEmail: string): Promise<ShareResult> {
+  return apiRequest<ShareResult>(`/candidates/${encodeURIComponent(candidateId)}/share`, {
+    method: 'POST',
+    body: { recipientEmail },
+    auth: true,
+  });
+}
+
+/** Recruiter: permanently delete a candidate and all their data (database + stored videos). */
+export function deleteCandidate(candidateId: string): Promise<{ deleted: Record<string, number> }> {
+  return apiRequest<{ deleted: Record<string, number> }>(`/candidates/${encodeURIComponent(candidateId)}`, {
+    method: 'DELETE',
+    auth: true,
+  });
+}
+
+/** Public (hiring manager): what a share link covers — one response or the full assessment. */
+export function getSharedContent(token: string): Promise<SharedContent> {
+  return apiRequest<SharedContent>(`/shared-responses/${encodeURIComponent(token)}`);
 }

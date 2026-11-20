@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ApiError } from '../services/apiClient';
-import { getSharedResponse } from '../services/reportService';
-import type { SharedResponse } from '../types/report';
+import { getSharedContent } from '../services/reportService';
+import type { SharedContent, VideoPlayback } from '../types/report';
 import { formatDateTime } from '../utils/format';
 import { RefreshingVideo } from '../components/report/RefreshingVideo';
 import { Icon } from '../components/ui/Icon';
 
 type View =
   | { kind: 'loading' }
-  | { kind: 'ready'; data: SharedResponse }
+  | { kind: 'ready'; data: SharedContent }
   | { kind: 'invalid' }
   | { kind: 'expired' }
   | { kind: 'error'; message: string };
@@ -22,7 +22,7 @@ export function SharedResponsePage() {
 
   useEffect(() => {
     let cancelled = false;
-    getSharedResponse(token)
+    getSharedContent(token)
       .then((data) => !cancelled && setView({ kind: 'ready', data }))
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -35,7 +35,15 @@ export function SharedResponsePage() {
     };
   }, [token, attempt]);
 
-  const refreshVideo = useCallback(async () => (await getSharedResponse(token)).response.video, [token]);
+  /** Fresh presigned URL for one video (they expire after a few minutes). */
+  const refreshVideo = useCallback(
+    async (questionNumber?: number): Promise<VideoPlayback | null> => {
+      const fresh = await getSharedContent(token);
+      if (fresh.type === 'response') return fresh.response.video;
+      return fresh.questions.find((q) => q.number === questionNumber)?.video ?? null;
+    },
+    [token],
+  );
 
   return (
     <section className="page candidate-page shared-response">
@@ -85,7 +93,7 @@ export function SharedResponsePage() {
         </>
       )}
 
-      {view.kind === 'ready' && (
+      {view.kind === 'ready' && view.data.type === 'response' && (
         <>
           <div className="shared-banner">
             <span className="shared-pill">
@@ -117,11 +125,62 @@ export function SharedResponsePage() {
             <Icon name="video" size={15} /> Video answer
           </h3>
           {view.data.response.video.available ? (
-            <RefreshingVideo video={view.data.response.video} label="Video answer" onRefresh={refreshVideo} />
+            <RefreshingVideo video={view.data.response.video} label="Video answer" onRefresh={() => refreshVideo()} />
           ) : (
             <p className="missing-block">No video was recorded for this question.</p>
           )}
 
+          <p className="field-hint shared-expiry">
+            <Icon name="clock" size={14} /> This link expires on {formatDateTime(view.data.expiresAt)}.
+          </p>
+        </>
+      )}
+
+      {view.kind === 'ready' && view.data.type === 'report' && (
+        <>
+          <div className="shared-banner">
+            <span className="shared-pill">
+              <Icon name="eye" size={14} /> Shared candidate assessment · read-only
+            </span>
+          </div>
+          <span className="eyebrow">Candidate</span>
+          <h1>{view.data.candidateName}</h1>
+          <p className="field-hint">
+            All {view.data.questions.length} questions with the candidate’s written and video answers.
+          </p>
+          <ol className="report-list shared-report-list">
+            {view.data.questions.map((q) => (
+              <li key={q.number} className="report-item" aria-label={`Question ${q.number}`}>
+                <div className="report-item-header">
+                  <span className="question-chip" aria-hidden="true">
+                    {q.number}
+                  </span>
+                  <h2>Question {q.number}</h2>
+                </div>
+                <p className="review-question">{q.text}</p>
+                <h3 className="report-subheading">
+                  <Icon name="text" size={15} /> Written answer
+                </h3>
+                {q.writtenAnswer.trim() ? (
+                  <p className="answer-block">{q.writtenAnswer}</p>
+                ) : (
+                  <p className="missing-block">No written answer</p>
+                )}
+                <h3 className="report-subheading">
+                  <Icon name="video" size={15} /> Video answer
+                </h3>
+                {q.video.available ? (
+                  <RefreshingVideo
+                    video={q.video}
+                    label={`Video answer to question ${q.number}`}
+                    onRefresh={() => refreshVideo(q.number)}
+                  />
+                ) : (
+                  <p className="missing-block">No video was recorded for this question.</p>
+                )}
+              </li>
+            ))}
+          </ol>
           <p className="field-hint shared-expiry">
             <Icon name="clock" size={14} /> This link expires on {formatDateTime(view.data.expiresAt)}.
           </p>

@@ -59,3 +59,9 @@ export const shareResponseSchema = z.object({
 });
 
 export type ShareResponseInput = z.infer<typeof shareResponseSchema>;
+
+export const shareReportSchema = z.object({
+  recipientEmail: shareResponseSchema.shape.recipientEmail,
+});
+
+export type ShareReportInput = z.infer<typeof shareReportSchema>;

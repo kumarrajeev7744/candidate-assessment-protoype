@@ -369,6 +369,7 @@ describe('GET /api/shared-responses/:token (public)', () => {
     expect(res.status).toBe(200);
     expect(res.headers['cache-control']).toBe('no-store');
     expect(res.body).toEqual({
+      type: 'response',
       candidateName: 'Priya Sharma',
       question: { number: 3, text: questionSeedData[2]!.questionText },
       response: {

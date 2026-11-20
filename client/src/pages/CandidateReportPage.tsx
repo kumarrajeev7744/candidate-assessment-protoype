@@ -5,7 +5,7 @@ import { getCandidateReport } from '../services/reportService';
 import type { CandidateReport, ReportQuestion } from '../types/report';
 import { formatShortDateTime } from '../utils/format';
 import { RefreshingVideo } from '../components/report/RefreshingVideo';
-import { ShareResponseDialog } from '../components/report/ShareResponseDialog';
+import { ShareResponseDialog, type ShareTarget } from '../components/report/ShareResponseDialog';
 import { Icon } from '../components/ui/Icon';
 
 const STATUS_CLASS: Record<string, string> = {
@@ -38,7 +38,7 @@ export function CandidateReportPage() {
   const [report, setReport] = useState<CandidateReport | null>(null);
   const [error, setError] = useState<{ message: string; notFound: boolean } | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [shareTarget, setShareTarget] = useState<ReportQuestion | null>(null);
+  const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
   const reportRef = useRef<CandidateReport | null>(null);
 
   useEffect(() => {
@@ -138,6 +138,16 @@ export function CandidateReportPage() {
             {assessment.isExpired && <span className="badge badge-danger">Expired</span>}
           </div>
         </div>
+        {assessment.status === 'Completed' && (
+          <button
+            type="button"
+            className="button-primary report-share-all"
+            onClick={() => setShareTarget({ kind: 'report', questionCount: questions.length })}
+          >
+            <Icon name="share" size={16} />
+            Share full report
+          </button>
+        )}
       </div>
       <div className="report-summary">
         <div className="progress-bar" aria-hidden="true">
@@ -196,7 +206,9 @@ export function CandidateReportPage() {
                     <button
                       type="button"
                       className="button-primary button-small"
-                      onClick={() => setShareTarget(q)}
+                      onClick={() =>
+                        q.response && setShareTarget({ kind: 'response', responseId: q.response.id, questionNumber: q.questionNumber })
+                      }
                       aria-label={`Share question ${q.questionNumber}`}
                     >
                       <Icon name="share" size={15} />
@@ -233,12 +245,11 @@ export function CandidateReportPage() {
         })}
       </ol>
 
-      {shareTarget?.response && (
+      {shareTarget && (
         <ShareResponseDialog
           candidateId={candidate.id}
           candidateName={candidate.name}
-          responseId={shareTarget.response.id}
-          questionNumber={shareTarget.questionNumber}
+          target={shareTarget}
           onClose={() => setShareTarget(null)}
         />
       )}
